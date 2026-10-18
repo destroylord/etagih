@@ -1,0 +1,51 @@
+name: Laporan bug
+description: Sesuatu tidak berjalan sebagaimana mestinya
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih sudah melapor! **Celah keamanan jangan dilaporkan di sini** — lihat SECURITY.md.
+        Jangan sertakan data pribadi klien, API key, atau isi `.env`.
+  - type: textarea
+    id: what
+    attributes:
+      label: Apa yang terjadi?
+      description: Jelaskan masalahnya dan apa yang kamu harapkan terjadi.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Langkah mereproduksi
+      placeholder: |
+        1. Buka Invoice → Buat Invoice
+        2. Pilih mode Per jam …
+        3. Klik Simpan
+        4. Muncul error …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versi eTagih
+      placeholder: "1.0.0 / commit abc1234"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Cara instalasi
+      options:
+        - Docker (docker compose)
+        - Manual (Nginx/Apache + PHP-FPM)
+        - Lokal (Laragon / XAMPP / composer dev)
+        - Lainnya
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log / screenshot
+      description: Potongan `storage/logs/laravel-*.log` atau `docker compose logs app` yang relevan.
+      render: shell

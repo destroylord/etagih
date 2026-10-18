@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Dokumentasi
+    url: https://github.com/destroylord/etagih/tree/main/docs
+    about: Panduan instalasi, konfigurasi, dan troubleshooting.
+  - name: Laporkan celah keamanan (privat)
+    url: https://github.com/destroylord/etagih/security/advisories/new
+    about: Jangan laporkan celah keamanan lewat issue publik.

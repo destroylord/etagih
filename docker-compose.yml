@@ -1,0 +1,106 @@
+# eTagih — stack produksi untuk VPS 1 GB.
+#
+#   web        Caddy (HTTPS otomatis, port 80/443)
+#   app        PHP-FPM
+#   worker     queue:work  (WA konfirmasi pembayaran)
+#   scheduler  schedule:work (overdue, pengingat, invoice berulang)
+#   db         MariaDB
+#
+# Pakai image siap pakai dari ghcr.io (disarankan untuk VPS kecil):
+#   docker compose pull && docker compose up -d
+# Atau build sendiri dari kode ini:
+#   docker compose up -d --build
+#
+# ETAGIH_IMAGE   : prefix image, mis. ghcr.io/namakamu   (default di bawah)
+# ETAGIH_VERSION : tag image, mis. 1.1.0 / latest / edge (default latest)
+
+x-php: &php
+    build:
+        context: .
+        target: app
+    image: ${ETAGIH_IMAGE:-ghcr.io/destroylord}/etagih-app:${ETAGIH_VERSION:-latest}
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+        - storage:/var/www/html/storage
+    depends_on:
+        db:
+            condition: service_healthy
+    logging: &logging
+        driver: json-file
+        options:
+            max-size: '10m'
+            max-file: '3'
+
+services:
+    web:
+        build:
+            context: .
+            target: web
+        image: ${ETAGIH_IMAGE:-ghcr.io/destroylord}/etagih-web:${ETAGIH_VERSION:-latest}
+        restart: unless-stopped
+        ports:
+            - '80:80'
+            - '443:443'
+            - '443:443/udp'
+        environment:
+            APP_DOMAIN: ${APP_DOMAIN:?Isi APP_DOMAIN di .env}
+            ACME_EMAIL: ${ACME_EMAIL:-}
+        volumes:
+            - storage:/var/www/html/storage:ro
+            - caddy_data:/data
+            - caddy_config:/config
+        depends_on:
+            - app
+        mem_limit: 64m
+        logging: *logging
+
+    app:
+        <<: *php
+        environment:
+            CONTAINER_ROLE: app
+        mem_limit: 256m
+
+    worker:
+        <<: *php
+        environment:
+            CONTAINER_ROLE: worker
+        command: ['php', 'artisan', 'queue:work', '--sleep=3', '--tries=3', '--max-time=3600', '--memory=96']
+        healthcheck:
+            disable: true
+        mem_limit: 160m
+
+    scheduler:
+        <<: *php
+        environment:
+            CONTAINER_ROLE: scheduler
+        command: ['php', 'artisan', 'schedule:work']
+        healthcheck:
+            disable: true
+        mem_limit: 160m
+
+    db:
+        image: mariadb:11
+        restart: unless-stopped
+        environment:
+            MARIADB_DATABASE: ${DB_DATABASE}
+            MARIADB_USER: ${DB_USERNAME}
+            MARIADB_PASSWORD: ${DB_PASSWORD}
+            MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Isi DB_ROOT_PASSWORD di .env}
+        volumes:
+            - db:/var/lib/mysql
+            - ./docker/mariadb/my.cnf:/etc/mysql/conf.d/zz-app.cnf:ro
+        healthcheck:
+            test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+        mem_limit: 320m
+        logging: *logging
+
+volumes:
+    storage:
+    db:
+    caddy_data:
+    caddy_config:

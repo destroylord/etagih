@@ -1,0 +1,19 @@
+name: Usulan fitur
+description: Ide untuk membuat eTagih lebih berguna
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Masalah apa yang ingin diselesaikan?
+      description: Ceritakan situasinya, misalnya "Saya punya banyak klien dengan …, sehingga sulit untuk …".
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Usulan solusi
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatif yang sudah dicoba
