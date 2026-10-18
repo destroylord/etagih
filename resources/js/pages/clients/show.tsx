@@ -80,7 +80,7 @@ function remainingOf(inv: Invoice) {
         : Math.max(0, toNumber(inv.total) - toNumber(inv.paid_amount));
 }
 
-/** Proyek invoice, mis. "Gym › Allstar" (link ke halaman proyek). */
+/** Proyek invoice, mis. "Toko Online › Aplikasi Mobile" (link ke halaman proyek). */
 function InvoiceProject({ invoice }: { invoice: Invoice }) {
     const p = invoice.project;
 

@@ -180,7 +180,7 @@ export function ClientProjects({
                             Kelompokkan invoice & jam kerja {clientName} per
                             proyek, lalu pecah jadi sub-proyek bila perlu — mis.{' '}
                             <span className="font-medium text-foreground">
-                                Gym → Allstar, Buildy
+                                Toko Online → Aplikasi Mobile, Dashboard Admin
                             </span>
                             .
                         </>

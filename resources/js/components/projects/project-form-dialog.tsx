@@ -35,7 +35,7 @@ const selectClass =
  *
  * Contoh:
  *  - Proyek baru untuk klien:     <ProjectFormDialog clientId={5} ... />
- *  - Sub-proyek di bawah "Gym":   <ProjectFormDialog clientId={5} parentId={gym.id} ... />
+ *  - Sub-proyek di bawah "Toko Online": <ProjectFormDialog clientId={5} parentId={tokoOnline.id} ... />
  *  - Edit:                        <ProjectFormDialog project={p} ... />
  *  - Pilih klien di dialog:       <ProjectFormDialog clients={[...]} ... />
  */
@@ -112,7 +112,7 @@ export function ProjectFormDialog({
                         <DialogTitle>{title}</DialogTitle>
                         <DialogDescription>
                             {isSub
-                                ? 'Sub-proyek berada di bawah satu proyek utama, mis. Gym → Allstar.'
+                                ? 'Sub-proyek berada di bawah satu proyek utama, mis. Toko Online → Aplikasi Mobile.'
                                 : 'Proyek mengelompokkan invoice & jam kerja klien. Bisa punya sub-proyek.'}
                         </DialogDescription>
                     </DialogHeader>
@@ -180,7 +180,11 @@ export function ProjectFormDialog({
                             id="project_name"
                             value={data.name}
                             onChange={(e) => setData('name', e.target.value)}
-                            placeholder={isSub ? 'mis. Allstar' : 'mis. Gym'}
+                            placeholder={
+                                isSub
+                                    ? 'mis. Aplikasi Mobile'
+                                    : 'mis. Toko Online'
+                            }
                             autoFocus
                             required
                         />

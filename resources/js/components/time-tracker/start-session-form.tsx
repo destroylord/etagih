@@ -23,7 +23,7 @@ export type StartPayload = {
     clientId: number;
     clientName: string;
     projectId: number | null;
-    /** Nama lengkap proyek, mis. "Gym › Allstar". */
+    /** Nama lengkap proyek, mis. "Toko Online › Aplikasi Mobile". */
     projectName: string | null;
     description: string;
     unitPrice: number;

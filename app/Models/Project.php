@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Proyek milik klien. `parent_id` null = proyek utama (mis. "Gym"),
- * terisi = sub-proyek (mis. "Allstar", "Buildy"). Maksimal 2 level.
+ * Proyek milik klien. `parent_id` null = proyek utama (mis. "Toko Online"),
+ * terisi = sub-proyek (mis. "Aplikasi Mobile", "Dashboard Admin"). Maksimal 2 level.
  *
  * @property int $id
  * @property int $client_id
@@ -94,7 +94,7 @@ class Project extends Model
         return $this->parent_id !== null;
     }
 
-    /** "Gym › Allstar" untuk sub-proyek, "Gym" untuk proyek utama. */
+    /** "Toko Online › Aplikasi Mobile" untuk sub-proyek, "Toko Online" untuk proyek utama. */
     public function getFullNameAttribute(): string
     {
         if (! $this->parent_id) {

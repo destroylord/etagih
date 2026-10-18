@@ -50,7 +50,7 @@ export type Project = {
     client_id: number;
     parent_id: number | null;
     name: string;
-    /** "Gym › Allstar" */
+    /** "Toko Online › Aplikasi Mobile" */
     full_name?: string;
     description?: string | null;
     status: ProjectStatus;

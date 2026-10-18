@@ -49,7 +49,7 @@ export type TrackerSession = WorkSession & {
     user?: { id: number; name: string } | null;
 };
 
-/** "Gym › Allstar" — pakai full_name dari server, fallback rakit dari parent. */
+/** "Toko Online › Aplikasi Mobile" — pakai full_name dari server, fallback rakit dari parent. */
 export function projectLabel(
     p: Pick<Project, 'name' | 'full_name' | 'parent'> | null | undefined,
 ): string | null {

@@ -103,7 +103,7 @@ export function sampleValues(
         company_name: companyName || 'Nama Perusahaan Anda',
         invoice_number: `${prefix || 'INV'}-${ymd}-0001`,
         total: 'Rp 2.500.000',
-        project: 'Gym › Allstar',
+        project: 'Toko Online › Aplikasi Mobile',
         public_link: `${typeof window !== 'undefined' ? window.location.origin : 'https://contoh.id'}/pay/abc123`,
         amount: 'Rp 1.250.000',
         remaining: 'Rp 1.250.000',

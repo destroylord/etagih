@@ -45,7 +45,7 @@ export function ProjectStatusBadge({
     );
 }
 
-/** "Gym › Allstar" dari relasi project.parent. */
+/** "Toko Online › Aplikasi Mobile" dari relasi project.parent. */
 export function projectPath(
     project: Pick<Project, 'name' | 'full_name' | 'parent'> | null | undefined,
 ): string | null {

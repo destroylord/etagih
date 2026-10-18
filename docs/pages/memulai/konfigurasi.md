@@ -118,7 +118,7 @@ Buka **Pengaturan Invoice** di sidebar. Semua perubahan berlaku setelah klik **S
 | `{{client_name}}` | Nama klien | semua |
 | `{{company_name}}` | Nama perusahaan | semua |
 | `{{invoice_number}}` | Nomor invoice | semua |
-| `{{project}}` | Nama proyek (mis. `Gym › Allstar`), kosong bila tanpa proyek | semua |
+| `{{project}}` | Nama proyek (mis. `Toko Online › Aplikasi Mobile`), kosong bila tanpa proyek | semua |
 | `{{total}}` | Total invoice | invoice baru |
 | `{{public_link}}` | Link halaman bayar | invoice baru, pengingat |
 | `{{amount}}` | Nominal (pembayaran / cicilan / sisa) | konfirmasi bayar, pengingat |

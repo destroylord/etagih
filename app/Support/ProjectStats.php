@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  *   langsung ke proyek (bukan draft / dibatalkan).
  * - work_value — nilai pekerjaan (jumlah baris item, sebelum diskon & pajak)
  *   berdasarkan proyek efektif item: proyek item, atau proyek invoice.
- *   Inilah yang membagi invoice "Gym" ke sub-proyek Allstar / Buildy.
+ *   Inilah yang membagi invoice "Toko Online" ke sub-proyek Aplikasi Mobile / Dashboard Admin.
  * - tracked_seconds, unbilled_seconds — dari sesi Time Tracker.
  *
  * Proyek utama = nilainya sendiri + semua sub-proyeknya.

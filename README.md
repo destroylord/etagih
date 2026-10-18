@@ -14,7 +14,7 @@ Clients & projects, time tracking, QRIS payments, WhatsApp & email reminders, an
 
 - **Invoices** — fixed-price or hourly, full payment or 2–24 installments, percentage/amount discounts, VAT (PPN), **PPh 23 withholding**, recurring invoices, duplicate, void.
 - **Quotations** — send a quote (*penawaran harga*), let the client accept or decline online, then turn it into an invoice in one click.
-- **Clients → Projects → Sub-projects** — e.g. *Aqim → Gym → Allstar, Buildy*. Invoice lines, time entries and reports roll up per project.
+- **Clients → Projects → Sub-projects** — e.g. *PT Maju Jaya → Toko Online → Aplikasi Mobile, Dashboard Admin*. Invoice lines, time entries and reports roll up per project.
 - **Payments** — dynamic QRIS via [QRISLY](https://rajaongkir.com/docs/qrisly/getting-started/flow-overview-page) with webhook + server-side verification, manual bank transfer recording, automatic installment allocation.
 - **Receipts (kuitansi)** — numbered PDF receipt for every payment, emailed to the client, with an *e-Meterai* reminder above Rp5 million.
 - **Customisable QR codes** — colours, dot & corner shapes, framed card, centre logo.

@@ -280,7 +280,7 @@ export default function ProjectsIndex({ projects, clients, filters }: Props) {
                                 description={
                                     noClients
                                         ? 'Tambahkan klien terlebih dahulu, lalu buat proyek untuk mengelompokkan invoice dan jam kerjanya.'
-                                        : 'Buat proyek (mis. "Gym") lalu sub-proyek (mis. "Allstar", "Buildy") untuk memantau tagihan & jam kerja per pekerjaan.'
+                                        : 'Buat proyek (mis. "Toko Online") lalu sub-proyek (mis. "Aplikasi Mobile", "Dashboard Admin") untuk memantau tagihan & jam kerja per pekerjaan.'
                                 }
                                 action={
                                     noClients ? (

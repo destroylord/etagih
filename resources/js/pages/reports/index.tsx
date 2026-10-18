@@ -332,7 +332,7 @@ export default function Reports({
                             <EmptyState
                                 icon={FolderKanban}
                                 title="Belum ada data proyek"
-                                description="Tautkan invoice atau sesi Time Tracker ke proyek (mis. Gym → Allstar) untuk melihat ringkasan per proyek."
+                                description="Tautkan invoice atau sesi Time Tracker ke proyek (mis. Toko Online → Aplikasi Mobile) untuk melihat ringkasan per proyek."
                                 className="py-10"
                             />
                         ) : (

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import type { ProjectOption } from '@/types/models';
 import type { FormSession } from './utils';
 
-/** Nama lengkap proyek sesi ("Gym › Allstar"), dari daftar proyek atau relasi sesi. */
+/** Nama lengkap proyek sesi ("Toko Online › Aplikasi Mobile"), dari daftar proyek atau relasi sesi. */
 export function sessionProjectName(
     s: FormSession,
     projects: ProjectOption[],
