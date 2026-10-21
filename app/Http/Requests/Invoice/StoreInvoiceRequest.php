@@ -4,6 +4,9 @@ namespace App\Http\Requests\Invoice;
 
 use App\Models\Invoice;
 use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
+use App\Support\Access;
 use App\Support\Recurrence;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -52,6 +55,8 @@ class StoreInvoiceRequest extends FormRequest
             'items.*.hours_qty' => ['nullable', 'numeric', 'min:0'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            // Item dari tugas (dicek di after(): milik klien ini & belum ditagih di invoice lain).
+            'items.*.task_id' => ['nullable', 'integer', 'distinct', 'exists:tasks,id'],
             'items.*.session_ids' => ['nullable', 'array'],
             'items.*.session_ids.*' => ['integer', 'exists:work_sessions,id'],
 
@@ -70,7 +75,7 @@ class StoreInvoiceRequest extends FormRequest
      */
     public function after(): array
     {
-        return [function (Validator $validator) {
+        return [fn (Validator $validator) => $this->validateAccessAndTasks($validator), function (Validator $validator) {
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
@@ -122,5 +127,76 @@ class StoreInvoiceRequest extends FormRequest
                 }
             }
         }];
+    }
+
+    /**
+     * - Staf: klien harus terlihat (anggota proyeknya) dan tidak boleh membuat klien baru;
+     *   proyek invoice harus proyek yang ia ikuti.
+     * - Item dari tugas: tugas milik klien invoice, belum ditagih (atau sudah di invoice ini).
+     */
+    private function validateAccessAndTasks(Validator $validator): void
+    {
+        if ($validator->errors()->isNotEmpty()) {
+            return;
+        }
+
+        $user = $this->user();
+        $invoice = $this->route('invoice');
+        $clientId = $invoice instanceof Invoice ? $invoice->client_id : ($this->input('client_id') ? (int) $this->input('client_id') : null);
+
+        if ($user instanceof User && Access::isRestricted($user)) {
+            if ($clientId === null) {
+                $validator->errors()->add('client_id', 'Pilih klien dari proyek yang Anda ikuti. Hanya admin yang bisa menambah klien baru.');
+
+                return;
+            }
+            if (! Access::canSeeClient($user, $clientId)) {
+                $validator->errors()->add('client_id', 'Anda tidak punya akses ke klien ini.');
+
+                return;
+            }
+            if ($this->filled('project_id') && ! Access::canSeeProject($user, $this->integer('project_id'))) {
+                $validator->errors()->add('project_id', 'Anda tidak punya akses ke proyek ini.');
+
+                return;
+            }
+        }
+
+        $rows = (array) $this->input('items', []);
+        $taskIds = array_filter(array_map(fn ($row) => is_array($row) ? ($row['task_id'] ?? null) : null, $rows));
+        if ($taskIds === []) {
+            return;
+        }
+
+        $tasks = Task::query()->with('project:id,client_id')->whereIn('id', $taskIds)->get()->keyBy('id');
+        $invoiceId = $invoice instanceof Invoice ? $invoice->id : null;
+
+        foreach ($rows as $i => $row) {
+            $taskId = is_array($row) ? ($row['task_id'] ?? null) : null;
+            if (! $taskId) {
+                continue;
+            }
+
+            $task = $tasks->get((int) $taskId);
+            if (! $task instanceof Task || $clientId === null || $task->project->client_id !== $clientId) {
+                $validator->errors()->add("items.{$i}.task_id", 'Task bukan milik klien invoice ini.');
+
+                continue;
+            }
+            if ($user instanceof User && ! Access::canSeeProject($user, $task->project_id)) {
+                $validator->errors()->add("items.{$i}.task_id", 'Anda tidak punya akses ke task ini.');
+
+                continue;
+            }
+            if ($task->invoice_id !== null && $task->invoice_id !== $invoiceId) {
+                $validator->errors()->add("items.{$i}.task_id", "Task \"{$task->title}\" sudah ditagihkan di invoice lain.");
+
+                continue;
+            }
+            // Task baru (belum ada di invoice ini) harus selesai & bisa ditagih.
+            if ($task->invoice_id === null && ($task->status !== 'done' || ! $task->billable)) {
+                $validator->errors()->add("items.{$i}.task_id", "Task \"{$task->title}\" belum selesai atau tidak bisa ditagih.");
+            }
+        }
     }
 }

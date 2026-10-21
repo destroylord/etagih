@@ -16,6 +16,8 @@ Schedule::command('invoices:generate-recurring')->dailyAt('06:00');
 Schedule::command('app:invoice-reminders')->dailyAt('09:00');
 Schedule::command('sessions:cleanup-stale')->dailyAt('00:30');
 Schedule::command('quotes:expire')->dailyAt('00:10');
+// Pengingat tugas: tenggat besok & baru lewat tenggat (masing-masing sekali).
+Schedule::command('tasks:remind')->dailyAt('07:00');
 
 // Status sistem: detak scheduler & queue worker tiap menit, cek update harian.
 Schedule::call(fn () => SystemStatus::touchScheduler())->everyMinute()->name('etagih:heartbeat-scheduler');

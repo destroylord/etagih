@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureResourceVisible;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\EnsureUserRole;
 use App\Http\Middleware\HandleAppearance;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => EnsureUserRole::class,
+            'visible' => EnsureResourceVisible::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

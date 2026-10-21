@@ -2,16 +2,16 @@ import { useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    ResponsiveDialog,
+    ResponsiveDialogContent,
+    ResponsiveDialogDescription,
+    ResponsiveDialogFooter,
+    ResponsiveDialogHeader,
+    ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { toNumber } from '@/lib/format';
@@ -102,20 +102,20 @@ export function ProjectFormDialog({
           : 'Tambah proyek';
 
     return (
-        <Dialog
+        <ResponsiveDialog
             open={open}
             onOpenChange={(v) => !processing && onOpenChange(v)}
         >
-            <DialogContent className="sm:max-w-lg">
+            <ResponsiveDialogContent className="sm:max-w-lg">
                 <form onSubmit={submit} className="space-y-4" noValidate>
-                    <DialogHeader>
-                        <DialogTitle>{title}</DialogTitle>
-                        <DialogDescription>
+                    <ResponsiveDialogHeader>
+                        <ResponsiveDialogTitle>{title}</ResponsiveDialogTitle>
+                        <ResponsiveDialogDescription>
                             {isSub
                                 ? 'Sub-proyek berada di bawah satu proyek utama, mis. Toko Online → Aplikasi Mobile.'
                                 : 'Proyek mengelompokkan invoice & jam kerja klien. Bisa punya sub-proyek.'}
-                        </DialogDescription>
-                    </DialogHeader>
+                        </ResponsiveDialogDescription>
+                    </ResponsiveDialogHeader>
 
                     {!isEdit && clientId === null && (
                         <div className="grid gap-2">
@@ -253,7 +253,7 @@ export function ProjectFormDialog({
                         <InputError message={errors.description} />
                     </div>
 
-                    <DialogFooter className="gap-2">
+                    <ResponsiveDialogFooter className="gap-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -273,9 +273,9 @@ export function ProjectFormDialog({
                             {processing && <Spinner />}
                             {isEdit ? 'Simpan' : 'Tambah'}
                         </Button>
-                    </DialogFooter>
+                    </ResponsiveDialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </ResponsiveDialogContent>
+        </ResponsiveDialog>
     );
 }

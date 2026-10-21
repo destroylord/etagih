@@ -5,17 +5,17 @@ import type { KeyboardEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    ResponsiveDialog,
+    ResponsiveDialogContent,
+    ResponsiveDialogDescription,
+    ResponsiveDialogFooter,
+    ResponsiveDialogHeader,
+    ResponsiveDialogTitle,
+    ResponsiveDialogTrigger,
+} from '@/components/ui/responsive-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { FormProduct } from './utils';
@@ -116,20 +116,20 @@ export function ProductPickerDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogTrigger asChild>
+        <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+            <ResponsiveDialogTrigger asChild>
                 <Button type="button" variant="outline" size="sm">
                     <PackagePlus className="size-4" /> Pilih Produk
                 </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Pilih Produk</DialogTitle>
-                    <DialogDescription>
+            </ResponsiveDialogTrigger>
+            <ResponsiveDialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+                <ResponsiveDialogHeader>
+                    <ResponsiveDialogTitle>Pilih Produk</ResponsiveDialogTitle>
+                    <ResponsiveDialogDescription>
                         Centang produk untuk ditambahkan sebagai baris item.
                         Bisa lebih dari satu.
-                    </DialogDescription>
-                </DialogHeader>
+                    </ResponsiveDialogDescription>
+                </ResponsiveDialogHeader>
 
                 {groups.length === 0 ? (
                     <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -213,7 +213,7 @@ export function ProductPickerDialog({
                     </div>
                 </div>
 
-                <DialogFooter>
+                <ResponsiveDialogFooter>
                     <Button
                         type="button"
                         variant="outline"
@@ -229,8 +229,8 @@ export function ProductPickerDialog({
                         Tambahkan{' '}
                         {selected.length > 0 ? `${selected.length} produk` : ''}
                     </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </ResponsiveDialogFooter>
+            </ResponsiveDialogContent>
+        </ResponsiveDialog>
     );
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Notifications\UserInvitation;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -75,12 +76,14 @@ it('creates a user and emails a set-password link', function () {
     ])->assertSessionHas('success')->assertSessionMissing('temporary_password');
 
     $user = User::firstWhere('email', 'admin.baru@example.com');
-    expect($user->role)->toBe('admin');
-    Notification::assertSentTo($user, ResetPassword::class);
+    expect($user->role)->toBe('admin')
+        ->and($user->invited_at)->not->toBeNull();
+    Notification::assertSentTo($user, UserInvitation::class);
+    Notification::assertNotSentTo($user, ResetPassword::class);
 });
 
 it('shows a warning instead of crashing when the reset email fails', function () {
-    Password::shouldReceive('broker->sendResetLink')->andThrow(new RuntimeException('SMTP mati'));
+    Notification::shouldReceive('send')->andThrow(new RuntimeException('SMTP mati'));
 
     $this->actingAs($this->admin)->post(route('users.store'), [
         'name' => 'Staf Gagal Email',

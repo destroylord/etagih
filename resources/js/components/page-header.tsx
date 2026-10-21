@@ -27,7 +27,7 @@ export function PageHeader({
     return (
         <div
             className={cn(
-                'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between',
+                'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4',
                 className,
             )}
         >
@@ -46,20 +46,20 @@ export function PageHeader({
                 )}
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="truncate text-2xl font-semibold tracking-tight">
+                        <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
                             {title}
                         </h1>
                         {meta}
                     </div>
                     {description && (
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground sm:line-clamp-none">
                             {description}
                         </p>
                     )}
                 </div>
             </div>
             {actions && (
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
                     {actions}
                 </div>
             )}

@@ -20,6 +20,10 @@ import {
 } from '@/components/invoice-form/parts';
 import { ProductPickerDialog } from '@/components/invoice-form/product-picker-dialog';
 import type { FormClient, FormProduct } from '@/components/invoice-form/utils';
+import {
+    MobileActionBar,
+    MobileActionBarSpacer,
+} from '@/components/mobile/mobile-action-bar';
 import { ProjectSelect } from '@/components/projects/project-select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -90,6 +94,8 @@ export type QuoteFormProps = {
     submitLabel: string;
     cancelHref: string;
     defaultTaxRate?: number;
+    /** Staf tidak boleh membuat klien baru dari form ini. */
+    canCreateClient?: boolean;
 };
 
 export function QuoteForm({
@@ -103,6 +109,7 @@ export function QuoteForm({
     submitLabel,
     cancelHref,
     defaultTaxRate = 0,
+    canCreateClient = true,
 }: QuoteFormProps) {
     const isEdit = mode === 'edit';
     const form = useForm<QuoteFormData>(initial);
@@ -110,7 +117,7 @@ export function QuoteForm({
     const errors = form.errors as Record<string, string | undefined>;
 
     const [newClient, setNewClient] = useState(
-        !isEdit && initial.client_id === null,
+        !isEdit && canCreateClient && initial.client_id === null,
     );
     const submittedKeys = useRef<string[]>([]);
     const errorAlertRef = useRef<HTMLDivElement>(null);
@@ -381,7 +388,7 @@ export function QuoteForm({
                             : 'Pilih klien (dan proyeknya) atau isi calon klien baru.'
                     }
                     actions={
-                        !isEdit && clients.length > 0 ? (
+                        !isEdit && canCreateClient && clients.length > 0 ? (
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -1031,6 +1038,29 @@ export function QuoteForm({
                     </CardFooter>
                 </Card>
             </aside>
+
+            {/* Mobile/tablet: total + Simpan selalu terlihat di bawah layar. */}
+            <MobileActionBarSpacer className="md:block lg:hidden" />
+            <MobileActionBar mobileOnly className="md:block lg:hidden">
+                <div className="mx-auto flex max-w-3xl items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted-foreground">
+                            Total · {filledRows} item
+                        </p>
+                        <p className="truncate text-lg font-semibold tracking-tight tabular-nums">
+                            {formatIDR(totals.total)}
+                        </p>
+                    </div>
+                    <Button
+                        type="submit"
+                        className="h-11 shrink-0 px-5"
+                        disabled={form.processing}
+                    >
+                        {form.processing && <Spinner />}
+                        {form.processing ? 'Menyimpan…' : submitLabel}
+                    </Button>
+                </div>
+            </MobileActionBar>
         </form>
     );
 }

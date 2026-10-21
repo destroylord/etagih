@@ -35,6 +35,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useCan } from '@/hooks/use-can';
+import { useQueryFlag } from '@/hooks/use-query-flag';
 import { formatIDR, formatNumber } from '@/lib/format';
 import type { Client, Paginated } from '@/types/models';
 
@@ -69,6 +71,8 @@ export default function ClientsIndex({ clients, filters }: Props) {
     const [editing, setEditing] = useState<Client | null>(null);
     const [keyTarget, setKeyTarget] = useState<Client | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
+    // Tambah/edit/hapus/import klien & kunci portal hanya untuk admin.
+    const { manageClients } = useCan();
 
     const openForm = (client: Client | null) => {
         setEditing(client);
@@ -76,27 +80,31 @@ export default function ClientsIndex({ clients, filters }: Props) {
         setFormOpen(true);
     };
 
-    const rowActions = (c: Client) => (
-        <div className="flex items-center justify-end gap-0.5">
-            <IconAction
-                label="Edit klien"
-                icon={Pencil}
-                onClick={() => openForm(c)}
-            />
-            <IconAction
-                label="Buat kunci akses baru"
-                icon={KeyRound}
-                onClick={() => setKeyTarget(c)}
-            />
-            <IconAction
-                label="Hapus klien"
-                icon={Trash2}
-                destructive
-                disabledReason={deleteBlockedReason(c)}
-                onClick={() => setDeleteTarget(c)}
-            />
-        </div>
-    );
+    // `/clients?new=1` (aksi cepat mobile) langsung membuka form klien baru.
+    useQueryFlag('new', () => manageClients && openForm(null));
+
+    const rowActions = (c: Client) =>
+        manageClients && (
+            <div className="flex items-center justify-end gap-0.5">
+                <IconAction
+                    label="Edit klien"
+                    icon={Pencil}
+                    onClick={() => openForm(c)}
+                />
+                <IconAction
+                    label="Buat kunci akses baru"
+                    icon={KeyRound}
+                    onClick={() => setKeyTarget(c)}
+                />
+                <IconAction
+                    label="Hapus klien"
+                    icon={Trash2}
+                    destructive
+                    disabledReason={deleteBlockedReason(c)}
+                    onClick={() => setDeleteTarget(c)}
+                />
+            </div>
+        );
 
     const isSearching = filters.q !== '';
 
@@ -108,17 +116,19 @@ export default function ClientsIndex({ clients, filters }: Props) {
                     title="Klien"
                     description="Kelola data klien, tarif per jam, dan akses portal mereka."
                     actions={
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setImportOpen(true)}
-                            >
-                                <Upload /> Import
-                            </Button>
-                            <Button onClick={() => openForm(null)}>
-                                <Plus /> Klien baru
-                            </Button>
-                        </div>
+                        manageClients ? (
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setImportOpen(true)}
+                                >
+                                    <Upload /> Import
+                                </Button>
+                                <Button onClick={() => openForm(null)}>
+                                    <Plus /> Klien baru
+                                </Button>
+                            </div>
+                        ) : undefined
                     }
                 />
 
@@ -161,9 +171,11 @@ export default function ClientsIndex({ clients, filters }: Props) {
                                 title="Belum ada klien"
                                 description="Tambahkan klien pertama Anda untuk mulai membuat invoice dan membagikan akses portal."
                                 action={
-                                    <Button onClick={() => openForm(null)}>
-                                        <Plus /> Tambah klien
-                                    </Button>
+                                    manageClients ? (
+                                        <Button onClick={() => openForm(null)}>
+                                            <Plus /> Tambah klien
+                                        </Button>
+                                    ) : undefined
                                 }
                             />
                         )

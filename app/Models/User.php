@@ -7,6 +7,8 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -20,6 +22,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $email
  * @property 'owner'|'admin'|'staff' $role
  * @property bool $is_active
+ * @property Carbon|null $invited_at
+ * @property Carbon|null $invitation_accepted_at
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -48,7 +52,15 @@ class User extends Authenticatable implements PasskeyUser
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'is_active' => 'boolean',
+            'invited_at' => 'datetime',
+            'invitation_accepted_at' => 'datetime',
         ];
+    }
+
+    /** Diundang lewat email tetapi belum membuat password. */
+    public function isInvitationPending(): bool
+    {
+        return $this->invited_at !== null && $this->invitation_accepted_at === null;
     }
 
     public const ROLES = ['owner', 'admin', 'staff'];
@@ -73,5 +85,33 @@ class User extends Authenticatable implements PasskeyUser
     public function hasRole(string ...$roles): bool
     {
         return in_array($this->role, $roles, true);
+    }
+
+    /**
+     * Proyek utama tempat pengguna menjadi anggota (akses staf, lihat App\Support\Access).
+     *
+     * @return BelongsToMany<Project, $this>
+     */
+    public function projects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_members')->withTimestamps();
+    }
+
+    /**
+     * Tugas yang ditugaskan ke pengguna.
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function assignedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assignee_id');
+    }
+
+    /** Notifikasi tugas juga dikirim via email (preferensi `notify_email`, default ya). */
+    public function wantsEmailNotifications(): bool
+    {
+        $value = $this->getAttribute('notify_email');
+
+        return $value === null || (bool) $value;
     }
 }

@@ -20,15 +20,15 @@ export function StatCard({
     className?: string;
 }) {
     return (
-        <Card className={cn('gap-0 p-5', className)}>
+        <Card className={cn('min-w-0 gap-0 p-4 sm:p-5', className)}>
             <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="min-w-0 text-xs font-medium text-muted-foreground sm:text-sm">
                     {label}
                 </p>
                 {Icon && (
                     <span
                         className={cn(
-                            'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                            'hidden size-8 shrink-0 items-center justify-center rounded-lg min-[400px]:flex',
                             tone === 'default' &&
                                 'bg-muted text-muted-foreground',
                             tone === 'success' &&
@@ -43,7 +43,7 @@ export function StatCard({
                     </span>
                 )}
             </div>
-            <div className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
+            <div className="mt-1 text-base font-semibold tracking-tight break-words tabular-nums sm:mt-2 sm:text-2xl">
                 {value}
             </div>
             {hint && (

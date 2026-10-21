@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\Access;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -129,6 +131,19 @@ class Quote extends Model
     public function convertedInvoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class, 'converted_invoice_id');
+    }
+
+    /**
+     * Penawaran yang boleh dilihat pengguna: kliennya terlihat (App\Support\Access).
+     *
+     * @param  Builder<Quote>  $query
+     * @return Builder<Quote>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = Access::clientIds($user);
+
+        return $ids === null ? $query : $query->whereIn($query->qualifyColumn('client_id'), $ids);
     }
 
     public function isDraft(): bool

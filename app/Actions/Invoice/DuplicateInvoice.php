@@ -11,6 +11,7 @@ use Carbon\CarbonInterface;
  *
  * - Item hourly yang berasal dari sessions disalin sebagai jam manual
  *   (sessions tetap milik invoice asal).
+ * - Tautan tugas (task_id) TIDAK disalin — tugas tetap tertagih di invoice asal.
  * - Jarak terbit→jatuh tempo dan pola cicilan dipertahankan relatif ke tanggal terbit baru.
  */
 class DuplicateInvoice

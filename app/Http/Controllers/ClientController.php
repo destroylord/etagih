@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Product;
+use App\Models\User;
 use App\Support\ProjectStats;
 use App\Support\XlsxWriter;
 use Illuminate\Database\Eloquent\Collection;
@@ -22,6 +23,7 @@ class ClientController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $clients = Client::query()
+            ->visibleTo($this->user($request))
             ->when($q !== '', fn ($w) => $w->where(function ($x) use ($q) {
                 $x->where('name', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
@@ -57,7 +59,7 @@ class ClientController extends Controller
             'client' => $client,
             'invoices' => $invoices,
             'products' => $products,
-            'projects' => ProjectStats::tree($client->projects()->topLevel()->with('children')->get()),
+            'projects' => ProjectStats::tree($client->projects()->topLevel()->visibleTo($this->user($request))->with('children')->get()),
             'summary' => [
                 'total_billed' => round((float) $summary->total_billed, 2),
                 'total_paid' => round((float) $summary->total_paid, 2),
@@ -329,6 +331,14 @@ class ClientController extends Controller
         $client->delete();
 
         return back()->with('success', 'Klien dihapus.');
+    }
+
+    private function user(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        return $user;
     }
 
     /**

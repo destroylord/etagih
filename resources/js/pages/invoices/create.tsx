@@ -20,6 +20,7 @@ export default function InvoicesCreate({
     preselectedMode = null,
     projects = [],
     preselectedProjectId = null,
+    canCreateClient = true,
 }: {
     clients: FormClient[];
     products: FormProduct[];
@@ -29,6 +30,7 @@ export default function InvoicesCreate({
     preselectedMode?: 'hourly' | null;
     projects?: ProjectOption[];
     preselectedProjectId?: number | null;
+    canCreateClient?: boolean;
 }) {
     // ?project_id=… dari halaman proyek → pilih proyek & kliennya sekaligus.
     const preselectedProject =
@@ -80,6 +82,7 @@ export default function InvoicesCreate({
                     submitLabel="Simpan sebagai Draft"
                     cancelHref="/invoices"
                     defaultTaxRate={Number(defaultTaxRate) || 0}
+                    canCreateClient={canCreateClient}
                 />
             </PageContainer>
         </>

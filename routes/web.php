@@ -4,13 +4,16 @@ use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientImportController;
 use App\Http\Controllers\ClientPortalController;
+use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\Invoice\InvoiceController;
 use App\Http\Controllers\Invoice\PaymentController;
 use App\Http\Controllers\Invoice\WebhookController;
 use App\Http\Controllers\InvoicePdfController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\PublicQuoteController;
+use App\Http\Controllers\PwaController;
 use App\Http\Controllers\QrisController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\ReceiptController;
@@ -18,37 +21,71 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SystemController;
+use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkSessionController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
 
+// PWA: manifest, service worker & halaman offline. Tanpa grup `web` (sesi,
+// cookie, CSRF) — publik, tidak bergantung login.
+Route::withoutMiddleware('web')->group(function () {
+    Route::get('manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
+    Route::get('sw.js', [PwaController::class, 'serviceWorker'])->name('pwa.sw');
+    Route::get('offline', [PwaController::class, 'offline'])->name('pwa.offline');
+});
+
 // Wizard instalasi pertama (hanya aktif selama belum ada user sama sekali).
 Route::get('setup', [SetupController::class, 'show'])->name('setup.show');
 Route::post('setup', [SetupController::class, 'store'])->middleware('throttle:10,1')->name('setup.store');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+// `visible`: staf hanya bisa membuka klien/proyek/invoice/penawaran/tugas dari
+// proyek yang ia ikuti (App\Http\Middleware\EnsureResourceVisible).
+Route::middleware(['auth', 'verified', 'visible'])->group(function () {
     Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
+    // Membuat / mengubah / menghapus / import klien khusus admin.
     Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
     // Import klien dari CSV / Excel (harus sebelum clients/{client}).
-    Route::get('clients/import/template', [ClientImportController::class, 'template'])->name('clients.import.template');
-    Route::post('clients/import/preview', [ClientImportController::class, 'preview'])->name('clients.import.preview');
-    Route::post('clients/import', [ClientImportController::class, 'store'])->name('clients.import.store');
+    Route::get('clients/import/template', [ClientImportController::class, 'template'])->middleware('role:admin')->name('clients.import.template');
+    Route::post('clients/import/preview', [ClientImportController::class, 'preview'])->middleware('role:admin')->name('clients.import.preview');
+    Route::post('clients/import', [ClientImportController::class, 'store'])->middleware('role:admin')->name('clients.import.store');
     Route::get('clients/{client}', [ClientController::class, 'show'])->name('clients.show');
     Route::get('clients/{client}/export', [ClientController::class, 'export'])->middleware('role:admin')->name('clients.export');
-    Route::post('clients', [ClientController::class, 'store'])->name('clients.store');
-    Route::put('clients/{client}', [ClientController::class, 'update'])->name('clients.update');
+    Route::post('clients', [ClientController::class, 'store'])->middleware('role:admin')->name('clients.store');
+    Route::put('clients/{client}', [ClientController::class, 'update'])->middleware('role:admin')->name('clients.update');
     Route::delete('clients/{client}', [ClientController::class, 'destroy'])->middleware('role:admin')->name('clients.destroy');
-    Route::post('clients/{client}/access-key', [ClientController::class, 'regenerateKey'])->name('clients.access-key');
+    Route::post('clients/{client}/access-key', [ClientController::class, 'regenerateKey'])->middleware('role:admin')->name('clients.access-key');
 
-    // Proyek & sub-proyek (Klien → Proyek → Sub-proyek)
+    // Proyek & sub-proyek (Klien → Proyek → Sub-proyek). Staf boleh membuat /
+    // mengubah sub-proyek di proyek yang ia ikuti (dicek di controller).
     Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
     Route::post('projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->middleware('role:admin')->name('projects.destroy');
+    Route::put('projects/{project}/members', [ProjectController::class, 'syncMembers'])->middleware('role:admin')->name('projects.members.sync');
+
+    // Tugas. Baca detail lewat JSON (tasks.show) untuk panel samping; semua
+    // penulisan memakai redirect back() + flash (Inertia).
+    Route::get('tasks', [TaskController::class, 'index'])->name('tasks.index');
+    Route::post('tasks', [TaskController::class, 'store'])->name('tasks.store');
+    Route::get('tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
+    Route::put('tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+    Route::delete('tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+    Route::patch('tasks/{task}/move', [TaskController::class, 'move'])->name('tasks.move');
+    Route::post('tasks/{task}/start-timer', [TaskController::class, 'startTimer'])->name('tasks.start-timer');
+    Route::post('tasks/{task}/checklist', [TaskController::class, 'storeChecklistItem'])->name('tasks.checklist.store');
+    Route::put('task-checklist/{item}', [TaskController::class, 'updateChecklistItem'])->name('tasks.checklist.update');
+    Route::delete('task-checklist/{item}', [TaskController::class, 'destroyChecklistItem'])->name('tasks.checklist.destroy');
+    Route::post('tasks/{task}/comments', [TaskController::class, 'storeComment'])->name('tasks.comments.store');
+    Route::delete('task-comments/{comment}', [TaskController::class, 'destroyComment'])->name('tasks.comments.destroy');
+
+    // Notifikasi di aplikasi (lonceng).
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('notifications/{id}/read', [NotificationController::class, 'read'])->name('notifications.read');
 
     Route::get('products', [ProductController::class, 'index'])->name('products.index');
     Route::post('products', [ProductController::class, 'store'])->name('products.store');
@@ -59,6 +96,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/export', [ReportController::class, 'exportInvoices'])->middleware('role:admin')->name('invoices.export');
         Route::get('/create', [InvoiceController::class, 'create'])->name('invoices.create');
+        // Tugas selesai & belum ditagih untuk klien (JSON, harus sebelum /{invoice}).
+        Route::get('/billable-tasks', [InvoiceController::class, 'billableTasks'])->name('invoices.billable-tasks');
         Route::post('/', [InvoiceController::class, 'store'])->name('invoices.store');
         Route::get('/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
         Route::get('/{invoice}/edit', [InvoiceController::class, 'edit'])->name('invoices.edit');
@@ -102,6 +141,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('settings/users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::delete('settings/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
         Route::post('settings/users/{user}/password-reset', [UserController::class, 'sendPasswordReset'])->name('users.password-reset');
+        Route::post('settings/users/{user}/resend-invitation', [UserController::class, 'resendInvitation'])->name('users.resend-invitation');
         // Alihkan kepemilikan (hanya pemilik saat ini; dicek di controller).
         Route::post('settings/users/{user}/transfer-ownership', [UserController::class, 'transferOwnership'])->name('users.transfer-ownership');
 
@@ -132,6 +172,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // Public routes (no auth)
+// Terima undangan tim: buat password lalu langsung masuk.
+Route::middleware('guest')->group(function () {
+    Route::get('/invitation/{token}', [InvitationController::class, 'show'])->name('invitation.accept');
+    Route::post('/invitation', [InvitationController::class, 'store'])->middleware('throttle:10,1')->name('invitation.store');
+});
+
 Route::get('/pay/{token}', [PaymentController::class, 'show'])->name('pay.show');
 Route::get('/pay/{token}/status', [PaymentController::class, 'status'])->name('pay.status');
 Route::post('/pay/{token}/pay', [PaymentController::class, 'pay'])->name('pay.pay');

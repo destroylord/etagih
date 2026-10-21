@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Project;
+use App\Models\User;
 use App\Models\WorkSession;
+use App\Support\Access;
 use App\Support\ProjectStats;
+use App\Support\TaskPayload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,9 +27,13 @@ class ProjectController extends Controller
         $filters = $request->only(['q', 'client_id', 'status']);
         $q = trim((string) ($filters['q'] ?? ''));
 
+        $user = $this->user($request);
+
         $projects = Project::query()
             ->topLevel()
+            ->visibleTo($user)
             ->with(['client:id,name', 'children'])
+            ->withCount('members')
             ->when($request->filled('client_id'), fn ($w) => $w->where('client_id', $request->integer('client_id')))
             ->when($request->filled('status'), fn ($w) => $w->where('status', $request->string('status')))
             ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x
@@ -42,21 +49,23 @@ class ProjectController extends Controller
             $tree[(int) $node['id']] = $node;
         }
         $clients = $projects->getCollection()->mapWithKeys(fn (Project $p) => [$p->id => $p->client->only(['id', 'name'])])->all();
+        $memberCounts = $projects->getCollection()->mapWithKeys(fn (Project $p) => [$p->id => (int) $p->getAttribute('members_count')])->all();
         $rows = [];
         foreach ($tree as $id => $node) {
-            $rows[] = [...$node, 'client' => $clients[$id] ?? null];
+            $rows[] = [...$node, 'client' => $clients[$id] ?? null, 'members_count' => $memberCounts[$id] ?? 0];
         }
 
         return Inertia::render('projects/index', [
             // Paginator dengan data pohon proyek + statistik.
             'projects' => [...$projects->toArray(), 'data' => $rows],
-            'clients' => Client::orderBy('name')->get(['id', 'name']),
+            'clients' => Client::visibleTo($user)->orderBy('name')->get(['id', 'name']),
             'filters' => $filters,
         ]);
     }
 
-    public function show(Project $project): Response
+    public function show(Request $request, Project $project): Response
     {
+        $user = $this->user($request);
         $project->load(['client:id,name', 'parent:id,name,client_id', 'children']);
         $root = $project->parent ?? $project;
         $root->loadMissing('children');
@@ -94,11 +103,70 @@ class ProjectController extends Controller
             'stats' => $this->statsOf($tree, $project->id),
             'invoices' => $invoices,
             'sessions' => $sessions,
+            // Anggota tim proyek utama (sub-proyek mewarisi).
+            'members' => $this->memberPayload($root),
+            // Pilihan anggota: admin → semua pengguna aktif; staf → anggota proyek utama.
+            'assignableUsers' => $user->isAdmin()
+                ? User::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email', 'role'])
+                    ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'role' => (string) $u->role])
+                    ->values()
+                : $this->memberPayload($root),
+            'canManageMembers' => $user->isAdmin(),
+            'taskSummary' => TaskPayload::summary($ids),
         ]);
+    }
+
+    /**
+     * Sinkronkan anggota tim proyek (admin). Disimpan di proyek utama; bila
+     * yang dikirim sub-proyek, keanggotaan dicatat di induknya. Hanya
+     * pengguna aktif yang disimpan.
+     */
+    public function syncMembers(Request $request, Project $project): RedirectResponse
+    {
+        $data = $request->validate([
+            'user_ids' => ['present', 'array'],
+            'user_ids.*' => ['integer', Rule::exists('users', 'id')->where('is_active', true)],
+        ], [
+            'user_ids.*.exists' => 'Anggota harus pengguna aktif.',
+        ]);
+
+        $root = $project->parent_id ? Project::query()->findOrFail($project->parent_id) : $project;
+        $root->members()->sync(array_values(array_unique(array_map('intval', $data['user_ids']))));
+
+        return back()->with('success', "Anggota proyek \"{$root->name}\" diperbarui.");
+    }
+
+    /**
+     * @return list<array{id: int, name: string, email: string, role: string}>
+     */
+    private function memberPayload(Project $root): array
+    {
+        return array_values($root->members()
+            ->orderBy('name')
+            ->get(['users.id', 'users.name', 'users.email', 'users.role'])
+            ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'role' => (string) $u->role])
+            ->all());
+    }
+
+    private function user(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        return $user;
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $user = $this->user($request);
+
+        // Staf hanya boleh membuat sub-proyek di proyek yang ia ikuti.
+        if (Access::isRestricted($user)) {
+            $parentId = (int) $request->input('parent_id');
+            abort_unless($parentId > 0, 403, 'Hanya admin yang bisa membuat proyek utama.');
+            abort_unless(Access::canSeeProject($user, $parentId), 403, 'Anda bukan anggota proyek ini.');
+        }
+
         $data = $this->validated($request);
         $project = Project::create($data);
 
@@ -109,6 +177,15 @@ class ProjectController extends Controller
 
     public function update(Request $request, Project $project): RedirectResponse
     {
+        $user = $this->user($request);
+
+        // Staf hanya boleh mengubah sub-proyek, dan tetap di bawah proyek yang ia ikuti.
+        if (Access::isRestricted($user)) {
+            abort_unless($project->parent_id !== null, 403, 'Hanya admin yang bisa mengubah proyek utama.');
+            $parentId = (int) ($request->input('parent_id') ?: 0);
+            abort_unless($parentId > 0 && Access::canSeeProject($user, $parentId), 403, 'Sub-proyek harus tetap di proyek yang Anda ikuti.');
+        }
+
         $data = $this->validated($request, $project);
         $project->update($data);
 
@@ -118,7 +195,7 @@ class ProjectController extends Controller
     public function destroy(Project $project): RedirectResponse
     {
         if ($project->isInUse()) {
-            return back()->with('error', 'Proyek sudah dipakai invoice / Time Tracker. Ubah statusnya menjadi "Diarsipkan" saja.');
+            return back()->with('error', 'Proyek sudah dipakai invoice / Time Tracker / tugas. Ubah statusnya menjadi "Diarsipkan" saja.');
         }
 
         $redirect = $project->parent_id

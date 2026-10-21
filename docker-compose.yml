@@ -12,7 +12,7 @@
 #   docker compose up -d --build
 #
 # ETAGIH_IMAGE   : prefix image, mis. ghcr.io/namakamu   (default di bawah)
-# ETAGIH_VERSION : tag image, mis. 1.1.0 / latest / edge (default latest)
+# ETAGIH_VERSION : tag image, mis. 1.2.0 / latest / edge (default latest)
 
 x-php: &php
     build:

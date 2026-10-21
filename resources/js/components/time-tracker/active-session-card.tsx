@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import {
     CloudOff,
     FolderKanban,
+    ListTodo,
     Pause,
     Play,
     Square,
@@ -97,6 +98,18 @@ export function ActiveSessionCard({
                             </Link>
                         </p>
                     )}
+                    {active.task && (
+                        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <ListTodo className="size-4 shrink-0" aria-hidden />
+                            <span className="sr-only">Task:</span>
+                            <Link
+                                href={`/tasks?task=${active.task.id}`}
+                                className="min-w-0 truncate font-medium text-foreground underline-offset-2 hover:underline"
+                            >
+                                {active.task.title}
+                            </Link>
+                        </p>
+                    )}
                     {active.notes && (
                         <p className="text-sm whitespace-pre-line text-muted-foreground">
                             {active.notes}
@@ -122,10 +135,11 @@ export function ActiveSessionCard({
                             Estimasi {formatIDR(estimate)} (sebelum pembulatan)
                         </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex gap-2 *:data-[slot=button]:h-11 sm:*:data-[slot=button]:h-9">
                         {active.status === 'running' ? (
                             <Button
                                 variant="outline"
+                                className="flex-1 sm:flex-none"
                                 onClick={() => onAction('pause')}
                                 disabled={disabled}
                             >
@@ -134,6 +148,7 @@ export function ActiveSessionCard({
                         ) : (
                             <Button
                                 variant="outline"
+                                className="flex-1 sm:flex-none"
                                 onClick={() => onAction('resume')}
                                 disabled={disabled}
                             >
@@ -142,6 +157,7 @@ export function ActiveSessionCard({
                         )}
                         <Button
                             variant="destructive"
+                            className="flex-1 sm:flex-none"
                             onClick={() => onAction('stop')}
                             disabled={disabled}
                         >
@@ -152,6 +168,7 @@ export function ActiveSessionCard({
                                 <Button
                                     variant="ghost"
                                     size="icon"
+                                    className="size-11 sm:size-9"
                                     disabled={disabled}
                                     aria-label="Batalkan sesi"
                                 >

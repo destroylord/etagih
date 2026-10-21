@@ -13,6 +13,8 @@ use App\Http\Requests\Quote\UpdateQuoteRequest;
 use App\Models\Client;
 use App\Models\Product;
 use App\Models\Quote;
+use App\Models\User;
+use App\Support\Access;
 use App\Support\QuotePdf;
 use App\Support\Settings;
 use Illuminate\Http\RedirectResponse;
@@ -31,7 +33,8 @@ class QuoteController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Quote::with(['client:id,name', 'project.parent'])->latest('id');
+        $user = $this->user($request);
+        $query = Quote::with(['client:id,name', 'project.parent'])->visibleTo($user)->latest('id');
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status')->toString());
@@ -50,8 +53,9 @@ class QuoteController extends Controller
         return Inertia::render('quotes/index', [
             'quotes' => $query->paginate(20)->withQueryString(),
             'filters' => $request->only(['status', 'q', 'client_id']),
-            'clients' => Client::orderBy('name')->get(['id', 'name']),
+            'clients' => Client::visibleTo($user)->orderBy('name')->get(['id', 'name']),
             'statusCounts' => Quote::query()
+                ->visibleTo($user)
                 ->selectRaw('status, COUNT(*) as total')
                 ->groupBy('status')
                 ->pluck('total', 'status')
@@ -66,7 +70,7 @@ class QuoteController extends Controller
             'defaultValidDays' => Quote::DEFAULT_VALID_DAYS,
             'preselectedClientId' => $request->integer('client_id') ?: null,
             'preselectedProjectId' => $request->integer('project_id') ?: null,
-            ...$this->formOptions(),
+            ...$this->formOptions($this->user($request)),
         ]);
     }
 
@@ -104,13 +108,13 @@ class QuoteController extends Controller
         ]);
     }
 
-    public function edit(Quote $quote): Response
+    public function edit(Request $request, Quote $quote): Response
     {
         abort_unless($quote->isDraft(), 422, 'Hanya penawaran draft yang bisa diedit.');
 
         return Inertia::render('quotes/edit', [
             'quote' => $quote->load(['client', 'project.parent', 'items']),
-            ...$this->formOptions(),
+            ...$this->formOptions($this->user($request)),
         ]);
     }
 
@@ -228,13 +232,26 @@ class QuoteController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function formOptions(): array
+    private function formOptions(User $user): array
     {
+        $clientIds = Access::clientIds($user);
+
         return [
-            'clients' => Client::orderBy('name')->get(['id', 'name', 'phone', 'email', 'hourly_rate']),
-            'projects' => WorkSessionController::projectOptions(),
-            'products' => Product::active()->orderBy('name')->get(['id', 'name', 'client_id']),
+            'clients' => Client::visibleTo($user)->orderBy('name')->get(['id', 'name', 'phone', 'email', 'hourly_rate']),
+            'projects' => WorkSessionController::projectOptions(false, $user),
+            'products' => Product::active()
+                ->when($clientIds !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('client_id')->orWhereIn('client_id', $clientIds)))
+                ->orderBy('name')->get(['id', 'name', 'client_id']),
+            'canCreateClient' => $user->isAdmin(),
         ];
+    }
+
+    private function user(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        return $user;
     }
 
     /**

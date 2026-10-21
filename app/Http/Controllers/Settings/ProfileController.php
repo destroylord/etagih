@@ -22,6 +22,8 @@ class ProfileController extends Controller
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            // Preferensi email notifikasi tugas (default ya).
+            'notifyEmail' => $request->user()->wantsEmailNotifications(),
         ]);
     }
 
@@ -30,7 +32,12 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $data = $request->validated();
+        $request->user()->fill(collect($data)->except('notify_email')->all());
+
+        if (array_key_exists('notify_email', $data)) {
+            $request->user()->forceFill(['notify_email' => (bool) $data['notify_email']]);
+        }
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;

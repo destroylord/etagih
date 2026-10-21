@@ -15,9 +15,12 @@ import {
 } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { DataCard, DataList } from '@/components/data-list';
 import { DataPagination } from '@/components/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/invoice-status-badge';
+import { FilterSheet } from '@/components/mobile/filter-sheet';
+import { OverflowActions } from '@/components/mobile/overflow-actions';
 import { PageContainer, PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -37,14 +40,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import {
     daysFromToday,
     dueLabel,
@@ -95,6 +90,30 @@ function buildQuery(filters: Filters): Record<string, string> {
     }
 
     return query;
+}
+
+function isLate(inv: Invoice): boolean {
+    return (
+        OPEN_STATUSES.includes(inv.status) &&
+        !!inv.due_date &&
+        (daysFromToday(inv.due_date) ?? 0) < 0
+    );
+}
+
+function remainingOf(inv: Invoice): number {
+    return inv.status === 'cancelled'
+        ? 0
+        : Math.max(0, toNumber(inv.total) - toNumber(inv.paid_amount));
+}
+
+function projectLabel(inv: Invoice): string {
+    if (!inv.project) {
+        return '';
+    }
+
+    return inv.project.parent
+        ? `${inv.project.parent.name} › ${inv.project.name}`
+        : inv.project.name;
 }
 
 export default function InvoicesIndex({
@@ -191,12 +210,17 @@ export default function InvoicesIndex({
                     description="Buat, kirim, dan pantau pembayaran invoice klien."
                     actions={
                         <>
-                            <Button variant="outline" asChild>
-                                <a href={exportHref}>
-                                    <FileSpreadsheet /> Export Excel
-                                </a>
-                            </Button>
-                            <Button asChild>
+                            <OverflowActions
+                                items={[
+                                    {
+                                        label: 'Export Excel',
+                                        icon: FileSpreadsheet,
+                                        href: exportHref,
+                                        external: true,
+                                    },
+                                ]}
+                            />
+                            <Button asChild className="flex-1 sm:flex-none">
                                 <Link href="/invoices/create">
                                     <Plus /> Buat Invoice
                                 </Link>
@@ -259,8 +283,8 @@ export default function InvoicesIndex({
                     </div>
 
                     {/* Pencarian & tipe */}
-                    <div className="flex flex-col gap-3 border-b p-3 sm:flex-row sm:items-center sm:p-4">
-                        <div className="relative flex-1">
+                    <div className="flex gap-2 border-b p-3 sm:items-center sm:gap-3 sm:p-4">
+                        <div className="relative min-w-0 flex-1">
                             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 type="search"
@@ -277,7 +301,18 @@ export default function InvoicesIndex({
                                 <Spinner className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground" />
                             )}
                         </div>
-                        <div className="flex gap-2">
+                        <FilterSheet
+                            className="flex gap-2"
+                            activeCount={
+                                (current.type ? 1 : 0) +
+                                (current.project_id ? 1 : 0)
+                            }
+                            onReset={
+                                current.type || current.project_id
+                                    ? () => apply({ type: '', project_id: '' })
+                                    : undefined
+                            }
+                        >
                             <Select
                                 value={current.type || ALL_TYPES}
                                 onValueChange={(v) =>
@@ -285,7 +320,7 @@ export default function InvoicesIndex({
                                 }
                             >
                                 <SelectTrigger
-                                    className="w-full sm:w-40"
+                                    className="w-full md:w-40"
                                     aria-label="Tipe pembayaran"
                                 >
                                     <SelectValue />
@@ -319,12 +354,12 @@ export default function InvoicesIndex({
                                 <Button
                                     variant="ghost"
                                     onClick={resetFilters}
-                                    className="shrink-0"
+                                    className="hidden shrink-0 md:inline-flex"
                                 >
                                     <X /> Reset
                                 </Button>
                             )}
-                        </div>
+                        </FilterSheet>
                     </div>
 
                     {invoices.data.length === 0 ? (
@@ -363,147 +398,206 @@ export default function InvoicesIndex({
                                 loading && 'opacity-60',
                             )}
                         >
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/40 hover:bg-muted/40">
-                                        <TableHead className="pl-4">
-                                            No. Invoice
-                                        </TableHead>
-                                        <TableHead>Klien</TableHead>
-                                        <TableHead className="hidden md:table-cell">
-                                            Tanggal
-                                        </TableHead>
-                                        <TableHead className="hidden sm:table-cell">
-                                            Jatuh tempo
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Total
-                                        </TableHead>
-                                        <TableHead className="hidden text-right lg:table-cell">
-                                            Sisa
-                                        </TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="w-12 pr-4">
+                            <DataList
+                                items={invoices.data}
+                                getKey={(inv) => inv.id}
+                                href={(inv) => `/invoices/${inv.id}`}
+                                columns={[
+                                    {
+                                        key: 'number',
+                                        header: 'No. Invoice',
+                                        className: 'pl-4 font-medium',
+                                        cell: (inv) => (
+                                            <Link
+                                                href={`/invoices/${inv.id}`}
+                                                className="hover:underline"
+                                                onClick={stop}
+                                            >
+                                                {inv.invoice_number}
+                                            </Link>
+                                        ),
+                                    },
+                                    {
+                                        key: 'client',
+                                        header: 'Klien',
+                                        className: 'max-w-[220px]',
+                                        cell: (inv) => (
+                                            <>
+                                                <div className="truncate">
+                                                    {inv.client?.name ?? '—'}
+                                                </div>
+                                                {inv.project && (
+                                                    <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                                                        <FolderKanban className="size-3 shrink-0" />
+                                                        {projectLabel(inv)}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ),
+                                    },
+                                    {
+                                        key: 'issue',
+                                        header: 'Tanggal',
+                                        className: 'text-muted-foreground',
+                                        cell: (inv) =>
+                                            formatDate(inv.issue_date),
+                                    },
+                                    {
+                                        key: 'due',
+                                        header: 'Jatuh tempo',
+                                        cell: (inv) => (
+                                            <>
+                                                <div className="text-muted-foreground">
+                                                    {formatDate(inv.due_date)}
+                                                </div>
+                                                {isLate(inv) && (
+                                                    <div className="text-xs font-medium text-red-600 dark:text-red-400">
+                                                        {dueLabel(inv.due_date)}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ),
+                                    },
+                                    {
+                                        key: 'total',
+                                        header: 'Total',
+                                        className: 'text-right',
+                                        cell: (inv) => (
+                                            <span
+                                                className={cn(
+                                                    'font-medium tabular-nums',
+                                                    inv.status ===
+                                                        'cancelled' &&
+                                                        'text-muted-foreground line-through',
+                                                )}
+                                            >
+                                                {formatIDR(inv.total)}
+                                            </span>
+                                        ),
+                                    },
+                                    {
+                                        key: 'remaining',
+                                        header: 'Sisa',
+                                        className:
+                                            'hidden text-right tabular-nums lg:table-cell',
+                                        cell: (inv) => {
+                                            const remaining = remainingOf(inv);
+
+                                            return (
+                                                <span
+                                                    className={
+                                                        remaining > 0
+                                                            ? 'text-foreground'
+                                                            : 'text-muted-foreground'
+                                                    }
+                                                >
+                                                    {inv.status === 'draft' ||
+                                                    remaining === 0
+                                                        ? '—'
+                                                        : formatIDR(remaining)}
+                                                </span>
+                                            );
+                                        },
+                                    },
+                                    {
+                                        key: 'status',
+                                        header: 'Status',
+                                        cell: (inv) => (
+                                            <StatusBadge status={inv.status} />
+                                        ),
+                                    },
+                                    {
+                                        key: 'actions',
+                                        header: (
                                             <span className="sr-only">
                                                 Aksi
                                             </span>
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {invoices.data.map((inv) => {
-                                        const isOpenInv =
-                                            OPEN_STATUSES.includes(inv.status);
-                                        const late =
-                                            isOpenInv &&
-                                            !!inv.due_date &&
-                                            (daysFromToday(inv.due_date) ?? 0) <
-                                                0;
-                                        const remaining =
-                                            inv.status === 'cancelled'
-                                                ? 0
-                                                : Math.max(
-                                                      0,
-                                                      toNumber(inv.total) -
-                                                          toNumber(
-                                                              inv.paid_amount,
-                                                          ),
-                                                  );
-                                        const href = `/invoices/${inv.id}`;
+                                        ),
+                                        className: 'w-12 pr-4 text-right',
+                                        stopPropagation: true,
+                                        cell: (inv) => (
+                                            <RowActions invoice={inv} />
+                                        ),
+                                    },
+                                ]}
+                                renderCard={(inv) => {
+                                    const remaining = remainingOf(inv);
 
-                                        return (
-                                            <TableRow
-                                                key={inv.id}
-                                                className="cursor-pointer"
-                                                onClick={() =>
-                                                    router.visit(href)
-                                                }
-                                            >
-                                                <TableCell className="pl-4 font-medium">
-                                                    <Link
-                                                        href={href}
-                                                        className="hover:underline"
-                                                        onClick={stop}
-                                                    >
-                                                        {inv.invoice_number}
-                                                    </Link>
-                                                    <div className="text-xs font-normal text-muted-foreground md:hidden">
-                                                        {formatDate(
-                                                            inv.issue_date,
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="max-w-[160px] sm:max-w-[220px]">
-                                                    <div className="truncate">
-                                                        {inv.client?.name ??
-                                                            '—'}
-                                                    </div>
-                                                    {inv.project && (
-                                                        <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                                                            <FolderKanban className="size-3 shrink-0" />
-                                                            {inv.project.parent
-                                                                ? `${inv.project.parent.name} › ${inv.project.name}`
-                                                                : inv.project
-                                                                      .name}
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="hidden text-muted-foreground md:table-cell">
-                                                    {formatDate(inv.issue_date)}
-                                                </TableCell>
-                                                <TableCell className="hidden sm:table-cell">
-                                                    <div className="text-muted-foreground">
-                                                        {formatDate(
-                                                            inv.due_date,
-                                                        )}
-                                                    </div>
-                                                    {late && (
-                                                        <div className="text-xs font-medium text-red-600 dark:text-red-400">
-                                                            {dueLabel(
-                                                                inv.due_date,
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell
+                                    return (
+                                        <DataCard
+                                            title={inv.invoice_number}
+                                            subtitle={inv.client?.name ?? '—'}
+                                            value={
+                                                <span
                                                     className={cn(
-                                                        'text-right font-medium tabular-nums',
                                                         inv.status ===
                                                             'cancelled' &&
                                                             'text-muted-foreground line-through',
                                                     )}
                                                 >
                                                     {formatIDR(inv.total)}
-                                                </TableCell>
-                                                <TableCell
-                                                    className={cn(
-                                                        'hidden text-right tabular-nums lg:table-cell',
-                                                        remaining > 0
-                                                            ? 'text-foreground'
-                                                            : 'text-muted-foreground',
+                                                </span>
+                                            }
+                                            badge={
+                                                <StatusBadge
+                                                    status={inv.status}
+                                                />
+                                            }
+                                            meta={
+                                                <>
+                                                    <span>
+                                                        {formatDate(
+                                                            inv.issue_date,
+                                                        )}
+                                                    </span>
+                                                    {isLate(inv) ? (
+                                                        <span className="font-medium text-red-600 dark:text-red-400">
+                                                            {dueLabel(
+                                                                inv.due_date,
+                                                            )}
+                                                        </span>
+                                                    ) : (
+                                                        inv.due_date && (
+                                                            <span>
+                                                                Jatuh tempo{' '}
+                                                                {formatDate(
+                                                                    inv.due_date,
+                                                                )}
+                                                            </span>
+                                                        )
                                                     )}
-                                                >
-                                                    {inv.status === 'draft' ||
-                                                    remaining === 0
-                                                        ? '—'
-                                                        : formatIDR(remaining)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <StatusBadge
-                                                        status={inv.status}
-                                                    />
-                                                </TableCell>
-                                                <TableCell
-                                                    className="pr-4 text-right"
-                                                    onClick={stop}
-                                                >
-                                                    <RowActions invoice={inv} />
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                                                    {inv.status !== 'draft' &&
+                                                        remaining > 0 &&
+                                                        remaining <
+                                                            toNumber(
+                                                                inv.total,
+                                                            ) && (
+                                                            <span className="tabular-nums">
+                                                                Sisa{' '}
+                                                                {formatIDR(
+                                                                    remaining,
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    {inv.project && (
+                                                        <span className="flex max-w-full min-w-0 items-center gap-1">
+                                                            <FolderKanban className="size-3 shrink-0" />
+                                                            <span className="truncate">
+                                                                {projectLabel(
+                                                                    inv,
+                                                                )}
+                                                            </span>
+                                                        </span>
+                                                    )}
+                                                </>
+                                            }
+                                        />
+                                    );
+                                }}
+                                renderCardActions={(inv) => (
+                                    <RowActions invoice={inv} />
+                                )}
+                            />
                             <DataPagination
                                 paginator={invoices}
                                 noun="invoice"
@@ -525,7 +619,7 @@ function RowActions({ invoice }: { invoice: Invoice }) {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8"
+                    className="size-10 md:size-8"
                     aria-label={`Aksi untuk ${invoice.invoice_number}`}
                 >
                     <MoreHorizontal />
@@ -582,7 +676,7 @@ function ProjectFilter({
     const roots = projects.filter((p) => p.parent_id === null);
 
     return (
-        <div className="relative w-full sm:w-52">
+        <div className="relative w-full md:w-52">
             <FolderKanban className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <select
                 aria-label="Filter proyek"

@@ -17,6 +17,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useCan } from '@/hooks/use-can';
 import { formatDuration, formatIDR } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { ProjectNode } from '@/types/models';
@@ -52,21 +53,25 @@ function RowActions({
     onAddSub,
 }: Handlers & { node: ProjectNode }) {
     const isSub = node.parent_id !== null;
+    // Staf boleh menambah/mengubah sub-proyek, tapi tidak proyek utama.
+    const { manageProjects, createSubProjects } = useCan();
 
     return (
         <div className="flex items-center justify-end gap-0.5">
-            {!isSub && (
+            {!isSub && createSubProjects && (
                 <IconAction
                     label="Tambah sub-proyek"
                     icon={FolderPlus}
                     onClick={() => onAddSub(node)}
                 />
             )}
-            <IconAction
-                label={isSub ? 'Edit sub-proyek' : 'Edit proyek'}
-                icon={Pencil}
-                onClick={() => onEdit(node)}
-            />
+            {(isSub || manageProjects) && (
+                <IconAction
+                    label={isSub ? 'Edit sub-proyek' : 'Edit proyek'}
+                    icon={Pencil}
+                    onClick={() => onEdit(node)}
+                />
+            )}
             <OpenAction node={node} />
         </div>
     );

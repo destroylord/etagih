@@ -30,6 +30,8 @@ export type ActiveView = {
     /** Akumulasi detik dari segmen-segmen sebelumnya. */
     accumulatedSeconds: number;
     notes: string | null;
+    /** Tugas yang dikerjakan (opsional). */
+    task: { id: number; title: string } | null;
     /** Belum tersinkron ke server. */
     localOnly: boolean;
 };
@@ -41,6 +43,8 @@ export type ActiveView = {
 export type LocalActiveWithProject = LocalActive & {
     project_id?: number | null;
     project_name?: string | null;
+    task_id?: number | null;
+    task_title?: string | null;
 };
 
 export type TrackerSession = WorkSession & {

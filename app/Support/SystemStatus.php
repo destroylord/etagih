@@ -73,6 +73,7 @@ class SystemStatus
             $this->php(),
             $this->environment(),
             $this->appUrl(),
+            $this->https(),
             $this->timezone(),
             $this->database(),
             $this->storage(),
@@ -180,6 +181,24 @@ class SystemStatus
         }
 
         return $this->make('app_url', 'Aplikasi', 'APP_URL', 'ok', $url, 'Memakai HTTPS.');
+    }
+
+    /** @return Check */
+    private function https(): array
+    {
+        $url = (string) config('app.url');
+        $docs = self::docsUrl('memulai/konfigurasi#aplikasi');
+
+        if (str_starts_with($url, 'https://')) {
+            return $this->make('https', 'Aplikasi', 'HTTPS (passkey & PWA)', 'ok', 'Aktif',
+                'Passkey (login sidik jari/wajah/PIN) dan instalasi aplikasi (PWA) bisa dipakai.');
+        }
+
+        $local = app()->environment('local');
+
+        return $this->make('https', 'Aplikasi', 'HTTPS (passkey & PWA)', $local ? 'info' : 'warning', 'Belum HTTPS',
+            'Browser hanya mengizinkan passkey dan instalasi aplikasi (PWA) di HTTPS'.($local ? ' (localhost dikecualikan untuk pengembangan).' : '.'),
+            'Pasang sertifikat SSL (mis. Caddy / Let\'s Encrypt) dan ubah APP_URL menjadi https://domain-anda.', $docs);
     }
 
     /** @return Check */

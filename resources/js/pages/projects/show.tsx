@@ -26,6 +26,8 @@ import { SiblingNavCard } from '@/components/projects/pages/sibling-nav-card';
 import { SubProjectsCard } from '@/components/projects/pages/sub-projects-card';
 import { ProjectFormDialog } from '@/components/projects/project-form-dialog';
 import { StatCard } from '@/components/stat-card';
+import { ProjectMembersCard } from '@/components/tasks/project-members-card';
+import { ProjectTasksCard } from '@/components/tasks/project-tasks-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +38,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useCan } from '@/hooks/use-can';
 import {
     formatDuration,
     formatIDR,
@@ -51,6 +54,7 @@ import type {
     ProjectStatus,
     WorkSession,
 } from '@/types/models';
+import type { ProjectMember, TaskSummary } from '@/types/tasks';
 
 type ShowProject = Project & {
     full_name: string;
@@ -65,6 +69,10 @@ type Props = {
     stats: ProjectStats;
     invoices: Paginated<Invoice>;
     sessions: WorkSession[];
+    members: ProjectMember[];
+    assignableUsers: ProjectMember[];
+    canManageMembers: boolean;
+    taskSummary: TaskSummary;
 };
 
 type FormState = { mode: 'edit' } | { mode: 'sub' };
@@ -75,8 +83,15 @@ export default function ProjectsShow({
     stats,
     invoices,
     sessions,
+    members = [],
+    assignableUsers = [],
+    canManageMembers = false,
+    taskSummary,
 }: Props) {
     const isSub = project.parent_id !== null;
+    // Staf: hanya sub-proyek yang boleh diubah; hapus & export khusus admin.
+    const { manageProjects, isAdmin, createSubProjects } = useCan();
+    const canEdit = isSub || manageProjects;
     const [formOpen, setFormOpen] = useState(false);
     const [formKey, setFormKey] = useState(0);
     const [formState, setFormState] = useState<FormState>({ mode: 'edit' });
@@ -169,26 +184,35 @@ export default function ProjectsShow({
                     }
                     actions={
                         <>
-                            <Button
-                                variant="outline"
-                                onClick={() => openForm({ mode: 'edit' })}
-                            >
-                                <Pencil /> Edit
-                            </Button>
-                            {!isSub && (
+                            {/* Mobile: aksi sekunder dipindah ke menu ⋯. */}
+                            {canEdit && (
                                 <Button
                                     variant="outline"
+                                    className="hidden sm:inline-flex"
+                                    onClick={() => openForm({ mode: 'edit' })}
+                                >
+                                    <Pencil /> Edit
+                                </Button>
+                            )}
+                            {!isSub && createSubProjects && (
+                                <Button
+                                    variant="outline"
+                                    className="hidden sm:inline-flex"
                                     onClick={() => openForm({ mode: 'sub' })}
                                 >
                                     <FolderPlus /> Tambah sub-proyek
                                 </Button>
                             )}
-                            <Button variant="outline" asChild>
+                            <Button
+                                variant="outline"
+                                className="hidden sm:inline-flex"
+                                asChild
+                            >
                                 <Link href={timerHref}>
                                     <Play /> Mulai timer
                                 </Link>
                             </Button>
-                            <Button asChild>
+                            <Button asChild className="flex-1 sm:flex-none">
                                 <Link href={createInvoiceHref}>
                                     <FilePlus2 /> Buat invoice
                                 </Link>
@@ -198,6 +222,7 @@ export default function ProjectsShow({
                                     <Button
                                         variant="outline"
                                         size="icon"
+                                        className="size-9 shrink-0"
                                         aria-label="Aksi lainnya"
                                         disabled={statusBusy}
                                     >
@@ -208,11 +233,42 @@ export default function ProjectsShow({
                                     align="end"
                                     className="w-52"
                                 >
-                                    <DropdownMenuItem asChild>
-                                        <a href={exportHref}>
-                                            <FileDown /> Export Excel
-                                        </a>
+                                    {canEdit && (
+                                        <DropdownMenuItem
+                                            className="sm:hidden"
+                                            onSelect={() =>
+                                                openForm({ mode: 'edit' })
+                                            }
+                                        >
+                                            <Pencil /> Edit
+                                        </DropdownMenuItem>
+                                    )}
+                                    {!isSub && createSubProjects && (
+                                        <DropdownMenuItem
+                                            className="sm:hidden"
+                                            onSelect={() =>
+                                                openForm({ mode: 'sub' })
+                                            }
+                                        >
+                                            <FolderPlus /> Tambah sub-proyek
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                        className="sm:hidden"
+                                        asChild
+                                    >
+                                        <Link href={timerHref}>
+                                            <Play /> Mulai timer
+                                        </Link>
                                     </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="sm:hidden" />
+                                    {isAdmin && (
+                                        <DropdownMenuItem asChild>
+                                            <a href={exportHref}>
+                                                <FileDown /> Export Excel
+                                            </a>
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem asChild>
                                         <Link
                                             href={`/invoices?project_id=${project.id}`}
@@ -220,8 +276,8 @@ export default function ProjectsShow({
                                             <Receipt /> Lihat semua invoice
                                         </Link>
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    {archived ? (
+                                    {canEdit && <DropdownMenuSeparator />}
+                                    {!canEdit ? null : archived ? (
                                         <DropdownMenuItem
                                             onSelect={() => setStatus('active')}
                                         >
@@ -236,19 +292,21 @@ export default function ProjectsShow({
                                             <Archive /> Arsipkan
                                         </DropdownMenuItem>
                                     )}
-                                    <DropdownMenuItem
-                                        variant="destructive"
-                                        onSelect={() => setDeleteOpen(true)}
-                                    >
-                                        <Trash2 /> Hapus
-                                    </DropdownMenuItem>
+                                    {manageProjects && (
+                                        <DropdownMenuItem
+                                            variant="destructive"
+                                            onSelect={() => setDeleteOpen(true)}
+                                        >
+                                            <Trash2 /> Hapus
+                                        </DropdownMenuItem>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </>
                     }
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
                     <StatCard
                         label="Ditagih"
                         value={formatIDR(stats.billed)}
@@ -302,6 +360,11 @@ export default function ProjectsShow({
 
                 <div className="grid gap-6 lg:grid-cols-3">
                     <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+                        <ProjectTasksCard
+                            project={project}
+                            summary={taskSummary}
+                            archived={project.status === 'archived'}
+                        />
                         {!isSub && (
                             <SubProjectsCard
                                 tree={tree}
@@ -372,6 +435,13 @@ export default function ProjectsShow({
                                 </dl>
                             </CardContent>
                         </Card>
+                        <ProjectMembersCard
+                            projectId={project.id}
+                            members={members}
+                            assignableUsers={assignableUsers}
+                            canManage={canManageMembers}
+                            parent={project.parent}
+                        />
                         <ProjectSessionsCard
                             sessions={sessions}
                             timerHref={timerHref}

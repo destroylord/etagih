@@ -26,10 +26,10 @@ use RuntimeException;
  */
 class WorkSessionAction
 {
-    public function start(int $userId, int $clientId, string $description, float $unitPrice, ?string $notes = null, ?int $projectId = null): WorkSession
+    public function start(int $userId, int $clientId, string $description, float $unitPrice, ?string $notes = null, ?int $projectId = null, ?int $taskId = null): WorkSession
     {
         // Atomic guard: request bersamaan dari user yang sama tetap serial. 5 detik cukup utk cek+insert.
-        return Cache::lock("work-session-user-{$userId}", 5)->block(3, function () use ($userId, $clientId, $description, $unitPrice, $notes, $projectId) {
+        return Cache::lock("work-session-user-{$userId}", 5)->block(3, function () use ($userId, $clientId, $description, $unitPrice, $notes, $projectId, $taskId) {
             $active = WorkSession::query()
                 ->where('user_id', $userId)
                 ->whereIn('status', ['running', 'paused'])
@@ -47,6 +47,7 @@ class WorkSessionAction
                 'user_id' => $userId,
                 'client_id' => $clientId,
                 'project_id' => $projectId,
+                'task_id' => $taskId,
                 'description' => $description,
                 'unit_price' => $unitPrice,
                 'started_at' => now(),

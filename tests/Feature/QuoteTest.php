@@ -143,11 +143,18 @@ it('renders index with status counts, create, show and edit pages', function () 
     $this->get(route('quotes.edit', $quote))->assertInertia(fn (Assert $page) => $page->component('quotes/edit'));
 });
 
-it('lets staff users manage quotes', function () {
-    $this->actingAs(User::factory()->state(['role' => 'staff'])->create());
+it('lets staff users manage quotes for clients of their projects', function () {
+    $staff = User::factory()->state(['role' => 'staff'])->create();
+    Project::create(['client_id' => $this->client->id, 'name' => 'Proyek Staf'])->members()->attach($staff);
+    $other = Client::create(['name' => 'Klien Lain']);
+    $this->actingAs($staff);
 
     $this->get(route('quotes.index'))->assertOk();
     $this->post(route('quotes.store'), quotePayload($this->client))->assertRedirect();
+    expect(Quote::count())->toBe(1);
+
+    // Klien di luar proyek yang diikuti ditolak.
+    $this->post(route('quotes.store'), quotePayload($other))->assertSessionHasErrors('client_id');
     expect(Quote::count())->toBe(1);
 });
 

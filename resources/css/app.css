@@ -140,4 +140,12 @@
     body {
         @apply bg-background text-foreground;
     }
+
+    /* PWA terpasang (standalone): jangan sampai konten tertutup status bar /
+       notch. Bernilai 0 bila status bar tidak menimpa konten. */
+    @media (display-mode: standalone) {
+        body {
+            padding-top: env(safe-area-inset-top);
+        }
+    }
 }

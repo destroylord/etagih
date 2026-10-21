@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
@@ -15,6 +15,7 @@ import {
     Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { DataCard, DataList } from '@/components/data-list';
 import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/invoice-status-badge';
 import { PageContainer, PageHeader } from '@/components/page-header';
@@ -29,14 +30,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { UpdateBanner } from '@/components/update-banner';
 import {
     daysFromToday,
@@ -168,7 +161,7 @@ export default function Dashboard({
                 <UpdateBanner />
 
                 {/* KPI */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
                     <StatCard
                         label="Piutang aktif"
                         value={formatIDR(stats.outstanding_amount)}
@@ -370,82 +363,68 @@ export default function Dashboard({
                             className="border-t"
                         />
                     ) : (
-                        <div className="border-t">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="hover:bg-transparent">
-                                        <TableHead className="pl-6">
-                                            No. invoice
-                                        </TableHead>
-                                        <TableHead className="hidden sm:table-cell">
-                                            Klien
-                                        </TableHead>
-                                        <TableHead className="hidden md:table-cell">
-                                            Tanggal
-                                        </TableHead>
-                                        <TableHead className="hidden md:table-cell">
-                                            Jatuh tempo
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Total
-                                        </TableHead>
-                                        <TableHead className="pr-6">
-                                            Status
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {recentInvoices.map((inv) => (
-                                        <TableRow
-                                            key={inv.id}
-                                            className="cursor-pointer"
-                                            onClick={(e) => {
-                                                if (
-                                                    (
-                                                        e.target as HTMLElement
-                                                    ).closest('a')
-                                                ) {
-                                                    return;
-                                                }
-
-                                                router.visit(
-                                                    `/invoices/${inv.id}`,
-                                                );
-                                            }}
+                        <DataList
+                            className="border-t"
+                            items={recentInvoices}
+                            getKey={(inv) => inv.id}
+                            href={(inv) => `/invoices/${inv.id}`}
+                            columns={[
+                                {
+                                    key: 'number',
+                                    header: 'No. invoice',
+                                    className: 'pl-6',
+                                    cell: (inv) => (
+                                        <Link
+                                            href={`/invoices/${inv.id}`}
+                                            className="font-medium hover:underline"
                                         >
-                                            <TableCell className="pl-6">
-                                                <Link
-                                                    href={`/invoices/${inv.id}`}
-                                                    className="font-medium hover:underline"
-                                                >
-                                                    {inv.invoice_number}
-                                                </Link>
-                                                <span className="block max-w-[10rem] truncate text-xs text-muted-foreground sm:hidden">
-                                                    {inv.client?.name ?? '—'}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="hidden max-w-[14rem] truncate sm:table-cell">
-                                                {inv.client?.name ?? '—'}
-                                            </TableCell>
-                                            <TableCell className="hidden text-muted-foreground md:table-cell">
-                                                {formatDate(inv.issue_date)}
-                                            </TableCell>
-                                            <TableCell className="hidden text-muted-foreground md:table-cell">
-                                                {formatDate(inv.due_date)}
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium tabular-nums">
-                                                {formatIDR(inv.total)}
-                                            </TableCell>
-                                            <TableCell className="pr-6">
-                                                <StatusBadge
-                                                    status={inv.status}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                            {inv.invoice_number}
+                                        </Link>
+                                    ),
+                                },
+                                {
+                                    key: 'client',
+                                    header: 'Klien',
+                                    className: 'max-w-[14rem] truncate',
+                                    cell: (inv) => inv.client?.name ?? '—',
+                                },
+                                {
+                                    key: 'issue',
+                                    header: 'Tanggal',
+                                    className: 'text-muted-foreground',
+                                    cell: (inv) => formatDate(inv.issue_date),
+                                },
+                                {
+                                    key: 'due',
+                                    header: 'Jatuh tempo',
+                                    className: 'text-muted-foreground',
+                                    cell: (inv) => formatDate(inv.due_date),
+                                },
+                                {
+                                    key: 'total',
+                                    header: 'Total',
+                                    className:
+                                        'text-right font-medium tabular-nums',
+                                    cell: (inv) => formatIDR(inv.total),
+                                },
+                                {
+                                    key: 'status',
+                                    header: 'Status',
+                                    className: 'pr-6',
+                                    cell: (inv) => (
+                                        <StatusBadge status={inv.status} />
+                                    ),
+                                },
+                            ]}
+                            renderCard={(inv) => (
+                                <DataCard
+                                    title={inv.client?.name ?? '—'}
+                                    subtitle={`${inv.invoice_number} · ${formatDate(inv.issue_date)}`}
+                                    value={formatIDR(inv.total)}
+                                    badge={<StatusBadge status={inv.status} />}
+                                />
+                            )}
+                        />
                     )}
                 </Card>
 

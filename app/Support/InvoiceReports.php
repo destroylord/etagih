@@ -18,14 +18,18 @@ class InvoiceReports
     /**
      * Pendapatan (pembayaran sukses) per bulan, N bulan terakhir termasuk bulan ini.
      *
+     * `$clientIds` (opsional) membatasi ke klien tertentu (dasbor staf); null = semua.
+     *
+     * @param  list<int>|null  $clientIds
      * @return list<array{month: string, label: string, amount: float, count: int}>
      */
-    public static function monthlyRevenue(int $months = 12, ?CarbonInterface $until = null): array
+    public static function monthlyRevenue(int $months = 12, ?CarbonInterface $until = null, ?array $clientIds = null): array
     {
         $end = ($until ?? now())->copy()->endOfMonth();
         $start = $end->copy()->subMonthsNoOverflow($months - 1)->startOfMonth();
 
         $payments = Payment::query()
+            ->when($clientIds !== null, fn ($q) => $q->whereHas('invoice', fn ($i) => $i->whereIn('client_id', $clientIds)))
             ->where('status', 'success')
             ->whereBetween('paid_at', [$start, $end])
             ->get(['amount', 'paid_at'])

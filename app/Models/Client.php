@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\Access;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -122,5 +124,18 @@ class Client extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class)->orderBy('name');
+    }
+
+    /**
+     * Klien yang boleh dilihat pengguna (lihat App\Support\Access).
+     *
+     * @param  Builder<Client>  $query
+     * @return Builder<Client>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = Access::clientIds($user);
+
+        return $ids === null ? $query : $query->whereIn($query->qualifyColumn('id'), $ids);
     }
 }

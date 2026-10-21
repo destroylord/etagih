@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\UserInvitation;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +42,8 @@ class UserController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
                 'is_active' => $user->is_active !== false,
+                'status' => $this->status($user),
+                'invited_at' => $user->invited_at?->toIso8601String(),
                 'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
                 'created_at' => $user->created_at?->toIso8601String(),
                 'is_self' => $user->is($actor),
@@ -49,6 +53,7 @@ class UserController extends Controller
                     'deactivate' => $this->canRestrict($actor, $user),
                     'delete' => $this->canRestrict($actor, $user),
                     'reset_password' => $this->canManage($actor, $user),
+                    'resend_invitation' => $this->canResendInvitation($actor, $user),
                     'transfer_ownership' => $this->canTransferTo($actor, $user),
                 ],
             ])
@@ -88,6 +93,8 @@ class UserController extends Controller
             'email_verified_at' => now(),
             // Mode undangan: password acak yang tidak pernah diketahui siapa pun.
             'password' => $temporary ?? Str::password(40),
+            // Mode undangan → status "Menunggu" sampai password dibuat.
+            'invited_at' => $temporary === null ? now() : null,
         ])->save();
 
         $redirect = redirect()->route('users.index');
@@ -103,9 +110,21 @@ class UserController extends Controller
                 ]);
         }
 
-        [$type, $message] = $this->sendResetLink($user, invite: true);
+        [$type, $message] = $this->sendInvitation($user, $actor, "Pengguna {$user->name} ditambahkan. ");
 
         return $redirect->with($type, $message);
+    }
+
+    /** Kirim ulang email undangan untuk pengguna yang belum membuat password. */
+    public function resendInvitation(Request $request, User $user): RedirectResponse
+    {
+        $actor = $this->actor($request);
+
+        abort_unless($this->canResendInvitation($actor, $user), 403, 'Undangan pengguna ini tidak bisa dikirim ulang.');
+
+        [$type, $message] = $this->sendInvitation($user, $actor, '');
+
+        return back()->with($type, $message);
     }
 
     public function update(Request $request, User $user): RedirectResponse
@@ -159,7 +178,7 @@ class UserController extends Controller
     {
         abort_unless($this->canManage($this->actor($request), $user), 403, 'Anda tidak boleh mengelola pengguna ini.');
 
-        [$type, $message] = $this->sendResetLink($user, invite: false);
+        [$type, $message] = $this->sendResetLink($user);
 
         return back()->with($type, $message);
     }
@@ -210,6 +229,24 @@ class UserController extends Controller
             && $this->canManage($actor, $target);
     }
 
+    private function canResendInvitation(User $actor, User $target): bool
+    {
+        return $target->isInvitationPending()
+            && $target->is_active !== false
+            && ! $actor->is($target)
+            && $this->canManage($actor, $target);
+    }
+
+    /** @return 'pending'|'active'|'inactive' */
+    private function status(User $user): string
+    {
+        return match (true) {
+            $user->is_active === false => 'inactive',
+            $user->isInvitationPending() => 'pending',
+            default => 'active',
+        };
+    }
+
     private function canTransferTo(User $actor, User $target): bool
     {
         return $actor->isOwner()
@@ -229,22 +266,51 @@ class UserController extends Controller
      *
      * @return array{0: 'success'|'warning', 1: string}
      */
-    private function sendResetLink(User $user, bool $invite): array
+    private function sendResetLink(User $user): array
     {
-        $prefix = $invite ? "Pengguna {$user->name} ditambahkan. " : '';
-
         try {
             $status = Password::broker()->sendResetLink(['email' => $user->email]);
         } catch (Throwable $e) {
             Log::warning('Gagal mengirim email atur password.', ['user_id' => $user->id, 'error' => $e->getMessage()]);
 
-            return ['warning', $prefix.'Email untuk mengatur password gagal dikirim — periksa konfigurasi email atau buat password sementara.'];
+            return ['warning', 'Email untuk mengatur password gagal dikirim — periksa konfigurasi email atau buat password sementara.'];
         }
 
         return match ($status) {
-            Password::RESET_LINK_SENT => ['success', $prefix."Email untuk mengatur password dikirim ke {$user->email}."],
-            Password::RESET_THROTTLED => ['warning', $prefix.'Email atur password baru saja dikirim. Tunggu sebentar sebelum mengirim ulang.'],
-            default => ['warning', $prefix.'Email untuk mengatur password tidak bisa dikirim.'],
+            Password::RESET_LINK_SENT => ['success', "Email untuk mengatur password dikirim ke {$user->email}."],
+            Password::RESET_THROTTLED => ['warning', 'Email atur password baru saja dikirim. Tunggu sebentar sebelum mengirim ulang.'],
+            default => ['warning', 'Email untuk mengatur password tidak bisa dikirim.'],
         };
+    }
+
+    /**
+     * Buat token lewat broker `invites` (berlaku 7 hari) lalu kirim email
+     * undangan. Kegagalan mail tidak membuat request gagal — cukup peringatan.
+     *
+     * @return array{0: 'success'|'warning', 1: string}
+     */
+    private function sendInvitation(User $user, User $inviter, string $prefix): array
+    {
+        $broker = Password::broker('invites');
+
+        if (! $broker instanceof PasswordBroker) {
+            return ['warning', $prefix.'Email undangan tidak bisa dikirim.'];
+        }
+
+        if ($broker->getRepository()->recentlyCreatedToken($user)) {
+            return ['warning', $prefix.'Undangan baru saja dikirim. Tunggu sebentar sebelum mengirim ulang.'];
+        }
+
+        try {
+            $token = $broker->createToken($user);
+            $user->forceFill(['invited_at' => now()])->save();
+            $user->notify(new UserInvitation($token, $inviter->name));
+        } catch (Throwable $e) {
+            Log::warning('Gagal mengirim email undangan.', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+
+            return ['warning', $prefix.'Email undangan gagal dikirim — periksa konfigurasi email, lalu kirim ulang undangan atau buat password sementara.'];
+        }
+
+        return ['success', $prefix."Undangan dikirim ke {$user->email} (berlaku 7 hari)."];
     }
 }

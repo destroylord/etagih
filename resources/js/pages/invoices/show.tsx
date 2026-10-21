@@ -149,13 +149,18 @@ export default function InvoicesShow({
                         <InvoicePaper invoice={invoice} settings={settings} />
                     </div>
 
-                    <aside className="grid gap-4">
-                        <PaymentSummaryCard
-                            invoice={invoice}
-                            onRecordPayment={
-                                open ? () => setPaymentOpen(true) : undefined
-                            }
-                        />
+                    {/* Mobile: ringkasan pembayaran tampil di atas kertas invoice. */}
+                    <aside className="contents lg:grid lg:gap-4">
+                        <div className="order-first min-w-0 lg:order-none">
+                            <PaymentSummaryCard
+                                invoice={invoice}
+                                onRecordPayment={
+                                    open
+                                        ? () => setPaymentOpen(true)
+                                        : undefined
+                                }
+                            />
+                        </div>
                         <RecurringCard
                             invoice={invoice}
                             generated={recurringChildren}

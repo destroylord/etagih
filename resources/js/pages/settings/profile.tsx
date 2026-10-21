@@ -1,10 +1,12 @@
 import { Form, Head, usePage } from '@inertiajs/react';
 import { Link } from '@inertiajs/react';
+import { useState } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/profile';
@@ -18,23 +20,27 @@ type PageProps = {
 export default function Profile({
     mustVerifyEmail,
     status,
+    notifyEmail = true,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
+    /** Preferensi email notifikasi tugas saat ini. */
+    notifyEmail?: boolean;
 }) {
     const { auth } = usePage<PageProps>().props;
+    const [emailNotif, setEmailNotif] = useState(notifyEmail);
 
     return (
         <>
-            <Head title="Profile settings" />
+            <Head title="Pengaturan profil" />
 
-            <h1 className="sr-only">Profile settings</h1>
+            <h1 className="sr-only">Pengaturan profil</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Profile"
-                    description="Update your name and email address"
+                    title="Profil"
+                    description="Perbarui nama dan alamat email Anda"
                 />
 
                 <Form
@@ -47,7 +53,7 @@ export default function Profile({
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="name">Nama</Label>
 
                                 <Input
                                     id="name"
@@ -56,7 +62,7 @@ export default function Profile({
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    placeholder="Full name"
+                                    placeholder="Nama lengkap"
                                 />
 
                                 <InputError
@@ -66,7 +72,7 @@ export default function Profile({
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                                <Label htmlFor="email">Alamat email</Label>
 
                                 <Input
                                     id="email"
@@ -76,7 +82,7 @@ export default function Profile({
                                     name="email"
                                     required
                                     autoComplete="username"
-                                    placeholder="Email address"
+                                    placeholder="Alamat email"
                                 />
 
                                 <InputError
@@ -89,33 +95,65 @@ export default function Profile({
                                 auth.user.email_verified_at === null && (
                                     <div>
                                         <p className="-mt-4 text-sm text-muted-foreground">
-                                            Your email address is unverified.{' '}
+                                            Alamat email Anda belum
+                                            diverifikasi.{' '}
                                             <Link
                                                 href={send()}
                                                 as="button"
                                                 className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                                             >
-                                                Click here to re-send the
-                                                verification email.
+                                                Klik di sini untuk mengirim
+                                                ulang email verifikasi.
                                             </Link>
                                         </p>
 
                                         {status ===
                                             'verification-link-sent' && (
                                             <div className="mt-2 text-sm font-medium text-green-600">
-                                                A new verification link has been
-                                                sent to your email address.
+                                                Link verifikasi baru sudah
+                                                dikirim ke alamat email Anda.
                                             </div>
                                         )}
                                     </div>
                                 )}
+
+                            <div className="flex items-start gap-3 rounded-lg border p-3">
+                                <input
+                                    type="hidden"
+                                    name="notify_email"
+                                    value={emailNotif ? '1' : '0'}
+                                />
+                                <Checkbox
+                                    id="notify_email"
+                                    className="mt-0.5"
+                                    checked={emailNotif}
+                                    onCheckedChange={(c) =>
+                                        setEmailNotif(c === true)
+                                    }
+                                />
+                                <div className="grid gap-1">
+                                    <Label
+                                        htmlFor="notify_email"
+                                        className="cursor-pointer"
+                                    >
+                                        Kirim notifikasi task ke email
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Selain lonceng notifikasi di aplikasi,
+                                        kirim juga email saat Anda ditugaskan,
+                                        ada komentar baru, atau tenggat task
+                                        sudah dekat/lewat.
+                                    </p>
+                                    <InputError message={errors.notify_email} />
+                                </div>
+                            </div>
 
                             <div className="flex items-center gap-4">
                                 <Button
                                     disabled={processing}
                                     data-test="update-profile-button"
                                 >
-                                    Save
+                                    Simpan
                                 </Button>
                             </div>
                         </>
@@ -131,7 +169,7 @@ export default function Profile({
 Profile.layout = {
     breadcrumbs: [
         {
-            title: 'Profile settings',
+            title: 'Pengaturan profil',
             href: edit(),
         },
     ],

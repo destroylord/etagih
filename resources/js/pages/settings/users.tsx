@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import {
     Crown,
     KeyRound,
+    MailPlus,
     MoreHorizontal,
     Pencil,
     Plus,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DataCard, DataList } from '@/components/data-list';
 import { EmptyState } from '@/components/empty-state';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -22,15 +24,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { ActiveBadge, RoleBadge } from '@/components/users/role-badge';
+import { RoleBadge, StatusBadge } from '@/components/users/role-badge';
 import { TemporaryPasswordDialog } from '@/components/users/temporary-password-dialog';
 import type { ManagedUser, TemporaryPassword } from '@/components/users/types';
 import { UserFormDialog } from '@/components/users/user-form-dialog';
@@ -47,7 +41,8 @@ type Props = {
 type PendingAction =
     | { type: 'delete'; user: ManagedUser }
     | { type: 'transfer'; user: ManagedUser }
-    | { type: 'reset'; user: ManagedUser };
+    | { type: 'reset'; user: ManagedUser }
+    | { type: 'resend'; user: ManagedUser };
 
 const ACTION_COPY = {
     delete: {
@@ -67,6 +62,12 @@ const ACTION_COPY = {
         confirm: 'Kirim email',
         description: (u: ManagedUser) =>
             `Tautan untuk mengatur password baru akan dikirim ke ${u.email}. Password lama tetap berlaku sampai diganti.`,
+    },
+    resend: {
+        title: 'Kirim ulang undangan?',
+        confirm: 'Kirim ulang',
+        description: (u: ManagedUser) =>
+            `Undangan baru (berlaku 7 hari) akan dikirim ke ${u.email}. Tautan undangan sebelumnya tidak berlaku lagi.`,
     },
 } as const;
 
@@ -109,6 +110,12 @@ export default function UsersSettings({
                 {},
                 options,
             );
+        } else if (type === 'resend') {
+            router.post(
+                `/settings/users/${user.id}/resend-invitation`,
+                {},
+                options,
+            );
         } else {
             router.post(
                 `/settings/users/${user.id}/password-reset`,
@@ -125,6 +132,7 @@ export default function UsersSettings({
         const hasAny =
             u.can.edit ||
             u.can.reset_password ||
+            u.can.resend_invitation ||
             u.can.transfer_ownership ||
             u.can.delete;
 
@@ -138,7 +146,7 @@ export default function UsersSettings({
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="size-8 text-muted-foreground"
+                        className="size-10 text-muted-foreground md:size-8"
                         aria-label={`Aksi untuk ${u.name}`}
                     >
                         <MoreHorizontal className="size-4" />
@@ -148,6 +156,15 @@ export default function UsersSettings({
                     {u.can.edit && (
                         <DropdownMenuItem onSelect={() => openForm(u)}>
                             <Pencil /> Edit
+                        </DropdownMenuItem>
+                    )}
+                    {u.can.resend_invitation && (
+                        <DropdownMenuItem
+                            onSelect={() =>
+                                setPending({ type: 'resend', user: u })
+                            }
+                        >
+                            <MailPlus /> Kirim ulang undangan
                         </DropdownMenuItem>
                     )}
                     {u.can.reset_password && (
@@ -210,27 +227,15 @@ export default function UsersSettings({
                             description="Tambah akun untuk anggota tim Anda."
                         />
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Pengguna</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="hidden md:table-cell">
-                                        2FA
-                                    </TableHead>
-                                    <TableHead className="hidden md:table-cell">
-                                        Dibuat
-                                    </TableHead>
-                                    <TableHead className="w-12">
-                                        <span className="sr-only">Aksi</span>
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {users.map((u) => (
-                                    <TableRow key={u.id}>
-                                        <TableCell>
+                        <DataList
+                            items={users}
+                            getKey={(u) => u.id}
+                            columns={[
+                                {
+                                    key: 'user',
+                                    header: 'Pengguna',
+                                    cell: (u) => (
+                                        <>
                                             <div className="font-medium">
                                                 {u.name}
                                                 {u.is_self && (
@@ -242,35 +247,75 @@ export default function UsersSettings({
                                             <div className="text-xs text-muted-foreground">
                                                 {u.email}
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <RoleBadge role={u.role} />
-                                        </TableCell>
-                                        <TableCell>
-                                            <ActiveBadge active={u.is_active} />
-                                        </TableCell>
-                                        <TableCell className="hidden md:table-cell">
-                                            {u.two_factor_enabled ? (
-                                                <span className="inline-flex items-center gap-1 text-sm text-emerald-700 dark:text-emerald-400">
-                                                    <ShieldCheck className="size-3.5" />
-                                                    Aktif
-                                                </span>
-                                            ) : (
-                                                <span className="text-sm text-muted-foreground">
-                                                    —
+                                        </>
+                                    ),
+                                },
+                                {
+                                    key: 'role',
+                                    header: 'Role',
+                                    cell: (u) => <RoleBadge role={u.role} />,
+                                },
+                                {
+                                    key: 'status',
+                                    header: 'Status',
+                                    cell: (u) => (
+                                        <StatusBadge status={u.status} />
+                                    ),
+                                },
+                                {
+                                    key: '2fa',
+                                    header: '2FA',
+                                    cell: (u) => (
+                                        <TwoFactor
+                                            enabled={u.two_factor_enabled}
+                                        />
+                                    ),
+                                },
+                                {
+                                    key: 'created',
+                                    header: 'Dibuat',
+                                    className: 'text-sm text-muted-foreground',
+                                    cell: (u) => formatDate(u.created_at),
+                                },
+                                {
+                                    key: 'actions',
+                                    header: (
+                                        <span className="sr-only">Aksi</span>
+                                    ),
+                                    className: 'w-12 text-right',
+                                    cell: (u) => rowActions(u),
+                                },
+                            ]}
+                            renderCard={(u) => (
+                                <DataCard
+                                    title={
+                                        <>
+                                            {u.name}
+                                            {u.is_self && (
+                                                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                                    (Anda)
                                                 </span>
                                             )}
-                                        </TableCell>
-                                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                                            {formatDate(u.created_at)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {rowActions(u)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                        </>
+                                    }
+                                    subtitle={u.email}
+                                    badge={<StatusBadge status={u.status} />}
+                                    meta={
+                                        <>
+                                            <RoleBadge role={u.role} />
+                                            {u.two_factor_enabled && (
+                                                <TwoFactor enabled />
+                                            )}
+                                            <span>
+                                                Dibuat{' '}
+                                                {formatDate(u.created_at)}
+                                            </span>
+                                        </>
+                                    }
+                                />
+                            )}
+                            renderCardActions={(u) => rowActions(u)}
+                        />
                     )}
                 </Card>
             </div>
@@ -296,6 +341,17 @@ export default function UsersSettings({
 
             <TemporaryPasswordDialog value={temporaryPassword} />
         </>
+    );
+}
+
+function TwoFactor({ enabled }: { enabled: boolean }) {
+    return enabled ? (
+        <span className="inline-flex items-center gap-1 text-sm text-emerald-700 dark:text-emerald-400">
+            <ShieldCheck className="size-3.5" />
+            2FA aktif
+        </span>
+    ) : (
+        <span className="text-sm text-muted-foreground">—</span>
     );
 }
 

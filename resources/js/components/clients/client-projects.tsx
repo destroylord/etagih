@@ -20,6 +20,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useCan } from '@/hooks/use-can';
 import { formatDuration, formatIDR } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { PROJECT_STATUS_LABEL } from '@/types/models';
@@ -82,7 +83,8 @@ function RowActions({
     onAddChild,
 }: {
     node: ProjectNode;
-    onEdit: () => void;
+    /** Tidak diisi = tombol Edit disembunyikan (proyek utama untuk staf). */
+    onEdit?: () => void;
     onAddChild?: () => void;
 }) {
     return (
@@ -103,9 +105,11 @@ function RowActions({
                         <ArrowUpRight /> Buka
                     </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={onEdit}>
-                    <Pencil /> Edit
-                </DropdownMenuItem>
+                {onEdit && (
+                    <DropdownMenuItem onSelect={onEdit}>
+                        <Pencil /> Edit
+                    </DropdownMenuItem>
+                )}
                 {onAddChild && (
                     <DropdownMenuItem onSelect={onAddChild}>
                         <FolderPlus /> Tambah sub-proyek
@@ -132,6 +136,8 @@ export function ClientProjects({
     const [dialog, setDialog] = useState<DialogState | null>(null);
     const [open, setOpen] = useState(false);
     const [dialogKey, setDialogKey] = useState(0);
+    // Proyek utama hanya bisa ditambah/diubah admin; staf boleh sub-proyek.
+    const { manageProjects, createSubProjects } = useCan();
 
     const show = (state: DialogState) => {
         setDialog(state);
@@ -162,13 +168,15 @@ export function ClientProjects({
                         </Badge>
                     )}
                 </CardTitle>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => show({ mode: 'create', parentId: null })}
-                >
-                    <Plus /> Tambah proyek
-                </Button>
+                {manageProjects && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => show({ mode: 'create', parentId: null })}
+                    >
+                        <Plus /> Tambah proyek
+                    </Button>
+                )}
             </CardHeader>
 
             {projects.length === 0 ? (
@@ -186,13 +194,15 @@ export function ClientProjects({
                         </>
                     }
                     action={
-                        <Button
-                            onClick={() =>
-                                show({ mode: 'create', parentId: null })
-                            }
-                        >
-                            <Plus /> Tambah proyek
-                        </Button>
+                        manageProjects ? (
+                            <Button
+                                onClick={() =>
+                                    show({ mode: 'create', parentId: null })
+                                }
+                            >
+                                <Plus /> Tambah proyek
+                            </Button>
+                        ) : undefined
                     }
                 />
             ) : (
@@ -214,14 +224,23 @@ export function ClientProjects({
                                 </div>
                                 <RowActions
                                     node={p}
-                                    onEdit={() =>
-                                        show({ mode: 'edit', project: p })
+                                    onEdit={
+                                        manageProjects
+                                            ? () =>
+                                                  show({
+                                                      mode: 'edit',
+                                                      project: p,
+                                                  })
+                                            : undefined
                                     }
-                                    onAddChild={() =>
-                                        show({
-                                            mode: 'create',
-                                            parentId: p.id,
-                                        })
+                                    onAddChild={
+                                        createSubProjects
+                                            ? () =>
+                                                  show({
+                                                      mode: 'create',
+                                                      parentId: p.id,
+                                                  })
+                                            : undefined
                                     }
                                 />
                             </div>

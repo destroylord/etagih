@@ -12,6 +12,10 @@ function Toaster({ ...props }: ToasterProps) {
             theme={appearance}
             className="toaster group"
             position="bottom-right"
+            // Mobile: di atas bottom nav (h-16 + safe area).
+            mobileOffset={{
+                bottom: 'calc(4.75rem + env(safe-area-inset-bottom))',
+            }}
             style={
                 {
                     '--normal-bg': 'var(--popover)',

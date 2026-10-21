@@ -49,6 +49,7 @@ import {
     saveQueue,
 } from '@/lib/work-session-sync';
 import type { Paginated, ProjectOption } from '@/types/models';
+import type { TimeTrackerTaskOption } from '@/types/tasks';
 
 const SUCCESS_MESSAGE: Record<QueueOp['kind'], string> = {
     start: 'Stopwatch dimulai.',
@@ -58,9 +59,10 @@ const SUCCESS_MESSAGE: Record<QueueOp['kind'], string> = {
     cancel: 'Sesi dibatalkan.',
 };
 
-/** Payload start + project_id (ikut terserialisasi ke antrean localStorage). */
+/** Payload start + project_id/task_id (ikut terserialisasi ke antrean localStorage). */
 type StartQueuePayload = NonNullable<QueueOp['payload']> & {
     project_id: number | null;
+    task_id: number | null;
 };
 
 function serverToLocal(a: TrackerSession): LocalActiveWithProject {
@@ -71,6 +73,8 @@ function serverToLocal(a: TrackerSession): LocalActiveWithProject {
         client_name: a.client?.name ?? '',
         project_id: a.project_id,
         project_name: projectLabel(a.project),
+        task_id: a.task?.id ?? null,
+        task_title: a.task?.title ?? null,
         description: a.description,
         unit_price: toNumber(a.unit_price),
         started_at: a.status === 'running' ? a.started_at : null,
@@ -84,6 +88,7 @@ export default function TimeTracker({
     active,
     clients,
     projects = [],
+    tasks = [],
     filters,
     defaultRate,
     totals,
@@ -92,6 +97,8 @@ export default function TimeTracker({
     active: TrackerSession | null;
     clients: TrackerClient[];
     projects?: ProjectOption[];
+    /** Tugas terbuka (milik saya lebih dulu) untuk pilihan di form mulai. */
+    tasks?: TimeTrackerTaskOption[];
     filters: TrackerFilters;
     defaultRate: number;
     totals?: {
@@ -156,6 +163,9 @@ export default function TimeTracker({
                 segmentStartedAt: local.started_at,
                 accumulatedSeconds: local.accumulated_seconds,
                 notes: null,
+                task: local.task_id
+                    ? { id: local.task_id, title: local.task_title ?? 'Task' }
+                    : null,
                 localOnly: local.localOnly,
             };
         }
@@ -184,6 +194,7 @@ export default function TimeTracker({
                 active.status === 'running' ? active.started_at : null,
             accumulatedSeconds: active.duration_seconds ?? 0,
             notes: active.notes,
+            task: active.task ?? null,
             localOnly: false,
         };
     }, [pending, localActive, bridge, active]);
@@ -258,7 +269,11 @@ export default function TimeTracker({
         (
             kind: QueueOp['kind'],
             payload?: QueueOp['payload'],
-            project?: { id: number | null; name: string | null },
+            project?: {
+                id: number | null;
+                name: string | null;
+                task?: { id: number; title: string } | null;
+            },
         ) => {
             const full: QueueOp = {
                 kind,
@@ -291,6 +306,8 @@ export default function TimeTracker({
                     ...next,
                     project_id: project.id,
                     project_name: project.name,
+                    task_id: project.task?.id ?? null,
+                    task_title: project.task?.title ?? null,
                 };
             }
 
@@ -314,8 +331,13 @@ export default function TimeTracker({
             description: p.description,
             unit_price: p.unitPrice,
             notes: p.notes,
+            task_id: p.task?.id ?? null,
         };
-        mutate('start', payload, { id: p.projectId, name: p.projectName });
+        mutate('start', payload, {
+            id: p.projectId,
+            name: p.projectName,
+            task: p.task,
+        });
     };
 
     const applyFilter = (patch: Partial<TrackerFilters>) => {
@@ -448,6 +470,7 @@ export default function TimeTracker({
                     <StartSessionForm
                         clients={clients}
                         projects={projects}
+                        tasks={tasks}
                         initialClientId={
                             filters.client_id ? Number(filters.client_id) : null
                         }
@@ -463,7 +486,7 @@ export default function TimeTracker({
                 )}
 
                 {/* Ringkasan */}
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
                     <StatCard
                         label="Total sesi"
                         value={formatNumber(sessions.total)}
@@ -481,6 +504,7 @@ export default function TimeTracker({
                     />
                     <StatCard
                         label="Nilai belum ditagih"
+                        className="col-span-2 sm:col-span-1"
                         value={formatIDR(summary.unbilledAmount)}
                         hint={
                             summary.unbilledAmount > 0 ? (

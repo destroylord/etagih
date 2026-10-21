@@ -17,6 +17,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useCan } from '@/hooks/use-can';
+import { useQueryFlag } from '@/hooks/use-query-flag';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { Paginated, ProjectNode, ProjectStatus } from '@/types/models';
@@ -136,6 +138,15 @@ export default function ProjectsIndex({ projects, clients, filters }: Props) {
     }));
 
     const noClients = clients.length === 0;
+    // Proyek utama hanya bisa dibuat/diubah admin (staf: sub-proyek saja).
+    const { manageProjects } = useCan();
+
+    // `/projects?new=1` langsung membuka form proyek baru.
+    useQueryFlag('new', () => {
+        if (!noClients && manageProjects) {
+            openForm({ mode: 'create' });
+        }
+    });
 
     return (
         <>
@@ -145,17 +156,19 @@ export default function ProjectsIndex({ projects, clients, filters }: Props) {
                     title="Proyek"
                     description="Kelompokkan invoice & jam kerja per proyek dan sub-proyek klien."
                     actions={
-                        <Button
-                            onClick={() => openForm({ mode: 'create' })}
-                            disabled={noClients}
-                            title={
-                                noClients
-                                    ? 'Tambahkan klien terlebih dahulu'
-                                    : undefined
-                            }
-                        >
-                            <Plus /> Tambah proyek
-                        </Button>
+                        manageProjects ? (
+                            <Button
+                                onClick={() => openForm({ mode: 'create' })}
+                                disabled={noClients}
+                                title={
+                                    noClients
+                                        ? 'Tambahkan klien terlebih dahulu'
+                                        : undefined
+                                }
+                            >
+                                <Plus /> Tambah proyek
+                            </Button>
+                        ) : undefined
                     }
                 />
 
@@ -283,7 +296,7 @@ export default function ProjectsIndex({ projects, clients, filters }: Props) {
                                         : 'Buat proyek (mis. "Toko Online") lalu sub-proyek (mis. "Aplikasi Mobile", "Dashboard Admin") untuk memantau tagihan & jam kerja per pekerjaan.'
                                 }
                                 action={
-                                    noClients ? (
+                                    !manageProjects ? undefined : noClients ? (
                                         <Button asChild>
                                             <Link href="/clients">
                                                 <Plus /> Tambah klien

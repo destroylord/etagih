@@ -79,6 +79,8 @@ export default function InvoicesEdit({
                 ),
                 session_ids: (it.sessions ?? []).map((s) => s.id),
                 project_id: it.project_id ?? null,
+                task_id: it.task_id ?? null,
+                task_title: it.task?.title,
             }),
         ),
         installments: {
@@ -128,6 +130,7 @@ export default function InvoicesEdit({
                     method="put"
                     submitLabel="Simpan Perubahan"
                     cancelHref={`/invoices/${invoice.id}`}
+                    invoiceId={invoice.id}
                 />
             </PageContainer>
         </>

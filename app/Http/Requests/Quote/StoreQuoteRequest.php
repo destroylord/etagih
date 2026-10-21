@@ -4,6 +4,8 @@ namespace App\Http\Requests\Quote;
 
 use App\Models\Project;
 use App\Models\Quote;
+use App\Models\User;
+use App\Support\Access;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -69,7 +71,7 @@ class StoreQuoteRequest extends FormRequest
      */
     public function after(): array
     {
-        return [function (Validator $validator) {
+        return [fn (Validator $validator) => $this->validateAccess($validator), function (Validator $validator) {
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
@@ -121,5 +123,25 @@ class StoreQuoteRequest extends FormRequest
                 }
             }
         }];
+    }
+
+    /** Staf: klien & proyek harus dari proyek yang ia ikuti; tidak boleh membuat klien baru. */
+    private function validateAccess(Validator $validator): void
+    {
+        $user = $this->user();
+        if ($validator->errors()->isNotEmpty() || ! $user instanceof User || ! Access::isRestricted($user)) {
+            return;
+        }
+
+        $quote = $this->route('quote');
+        $clientId = $quote instanceof Quote ? $quote->client_id : ($this->input('client_id') ? (int) $this->input('client_id') : null);
+
+        if ($clientId === null) {
+            $validator->errors()->add('client_id', 'Pilih klien dari proyek yang Anda ikuti. Hanya admin yang bisa menambah klien baru.');
+        } elseif (! Access::canSeeClient($user, $clientId)) {
+            $validator->errors()->add('client_id', 'Anda tidak punya akses ke klien ini.');
+        } elseif ($this->filled('project_id') && ! Access::canSeeProject($user, $this->integer('project_id'))) {
+            $validator->errors()->add('project_id', 'Anda tidak punya akses ke proyek ini.');
+        }
     }
 }

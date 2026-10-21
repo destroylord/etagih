@@ -5,9 +5,11 @@ namespace App\Actions\Invoice;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\PaymentSchedule;
+use App\Models\Task;
 use App\Models\WorkSession;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Logika bersama CreateInvoice & UpdateInvoice: bangun item, link sessions,
@@ -22,6 +24,13 @@ class InvoiceLineBuilder
      * - item dengan session_ids → jam = Σ durasi sessions (completed milik client).
      * - item tanpa sessions     → jam = hours_qty input (disimpan di manual_hours).
      *
+     * Item dari tugas (`task_id`, divalidasi di StoreInvoiceRequest):
+     * - item.task_id diisi, tugas ditandai invoice_id / invoice_item_id.
+     * - mode hourly: jam dari session_ids seperti biasa (frontend mengirim sesi tugas);
+     *   tugas berharga tetap tanpa sesi dikirim sebagai 1 jam × harga tetap.
+     * - mode fixed : harga = unit_price baris (harga tetap tugas / jam × tarif);
+     *   sesi tugas yang belum ditagih ikut ditautkan supaya tidak ditagih ulang.
+     *
      * @param  array<string, mixed>  $data
      */
     public function buildItems(Invoice $invoice, array $data): void
@@ -29,9 +38,17 @@ class InvoiceLineBuilder
         $isHourly = $data['invoice_mode'] === 'hourly';
         $subtotal = 0.0;
         $sessionMap = []; // session.id → invoice_item.id
+        $taskMap = []; // task.id → invoice_item.id
+
+        $taskIds = array_values(array_filter(array_map(
+            fn ($row) => is_array($row) && ! empty($row['task_id']) ? (int) $row['task_id'] : null,
+            (array) $data['items'],
+        )));
+        $tasks = $taskIds === [] ? collect() : Task::query()->with('project:id,parent_id')->whereIn('id', $taskIds)->get()->keyBy('id');
 
         foreach (array_values($data['items']) as $i => $row) {
             $unitPrice = (float) ($row['unit_price'] ?? 0);
+            $task = ! empty($row['task_id']) ? $tasks->get((int) $row['task_id']) : null;
 
             $sessions = ($isHourly && ! empty($row['session_ids']))
                 ? WorkSession::where('client_id', $invoice->client_id)
@@ -39,6 +56,15 @@ class InvoiceLineBuilder
                     ->where('status', 'completed')
                     ->get()
                 : collect();
+
+            // Mode fixed + tugas: sesi Time Tracker tugas yang belum ditagih ikut
+            // ditautkan ke item (harga tetap), supaya jamnya tidak ditagih dua kali.
+            if (! $isHourly && $task instanceof Task) {
+                $sessions = WorkSession::where('client_id', $invoice->client_id)
+                    ->where('task_id', $task->id)
+                    ->where('status', 'completed')
+                    ->get();
+            }
 
             $manualHours = null;
             if ($isHourly && $sessions->isEmpty() && ($row['hours_qty'] ?? '') !== '' && $row['hours_qty'] !== null) {
@@ -51,11 +77,12 @@ class InvoiceLineBuilder
 
             $lineTotal = $isHourly ? round($hours * $unitPrice, 2) : $unitPrice;
 
-            // Proyek item: pilihan eksplisit, atau proyek sesi Time Tracker bila semua sama.
+            // Proyek item: pilihan eksplisit, proyek tugas, atau proyek sesi Time Tracker bila semua sama.
             $sessionProjects = $sessions->pluck('project_id')->filter()->unique();
             $itemProjectId = ! empty($row['project_id'])
                 ? (int) $row['project_id']
-                : ($sessionProjects->count() === 1 ? (int) $sessionProjects->first() : null);
+                : ($this->taskProjectFor($invoice, $task)
+                    ?? ($sessionProjects->count() === 1 ? (int) $sessionProjects->first() : null));
             // Item yang proyeknya sama dengan proyek invoice tidak perlu ditandai ulang.
             if ($itemProjectId !== null && $itemProjectId === $invoice->project_id) {
                 $itemProjectId = null;
@@ -65,6 +92,7 @@ class InvoiceLineBuilder
                 'invoice_id' => $invoice->id,
                 'product_id' => $row['product_id'] ?? null,
                 'project_id' => $itemProjectId,
+                'task_id' => $task?->id,
                 'description' => (string) $row['description'],
                 'unit_price' => $unitPrice,
                 'manual_hours' => $manualHours,
@@ -75,7 +103,29 @@ class InvoiceLineBuilder
             foreach ($sessions as $session) {
                 $sessionMap[$session->id] = $item->id;
             }
+            if ($task instanceof Task) {
+                $taskMap[$task->id] = $item->id;
+            }
             $subtotal += $lineTotal;
+        }
+
+        foreach ($taskMap as $taskId => $itemId) {
+            // Atomik: hanya tugas yang belum ditagih (atau sudah di invoice ini).
+            // Validasi request bisa lolos bersamaan untuk dua invoice; yang kalah
+            // gagal di sini dan seluruh transaksi dibatalkan (tidak ditagih dua kali).
+            $linked = Task::withTrashed()
+                ->whereKey($taskId)
+                ->where(fn ($q) => $q->whereNull('invoice_id')->orWhere('invoice_id', $invoice->id))
+                ->update([
+                    'invoice_id' => $invoice->id,
+                    'invoice_item_id' => $itemId,
+                ]);
+
+            if ($linked === 0) {
+                throw ValidationException::withMessages([
+                    'items' => 'Salah satu tugas sudah ditagihkan di invoice lain. Muat ulang lalu coba lagi.',
+                ]);
+            }
         }
 
         $this->applyTotals($invoice, $subtotal, $data);
@@ -89,6 +139,37 @@ class InvoiceLineBuilder
                     'invoice_item_id' => $itemId,
                 ]);
         }
+    }
+
+    /**
+     * Lepas tugas yang ditagihkan di invoice ini (kembali "belum ditagih").
+     * Dipanggil saat item dibangun ulang (UpdateInvoice), draft dihapus, dan
+     * invoice dibatalkan — sama seperti sesi Time Tracker.
+     */
+    public static function releaseTasks(Invoice $invoice): void
+    {
+        Task::withTrashed()
+            ->where('invoice_id', $invoice->id)
+            ->update(['invoice_id' => null, 'invoice_item_id' => null]);
+    }
+
+    /**
+     * Proyek default item dari tugasnya — hanya bila cocok dengan proyek
+     * invoice (sama / sub-proyeknya) atau invoice tanpa proyek.
+     */
+    private function taskProjectFor(Invoice $invoice, ?Task $task): ?int
+    {
+        if (! $task instanceof Task) {
+            return null;
+        }
+
+        if ($invoice->project_id === null
+            || $task->project_id === $invoice->project_id
+            || $task->project->parent_id === $invoice->project_id) {
+            return $task->project_id;
+        }
+
+        return null;
     }
 
     /**

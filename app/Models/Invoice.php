@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\Access;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -137,6 +139,29 @@ class Invoice extends Model
     public function schedules(): HasMany
     {
         return $this->hasMany(PaymentSchedule::class)->orderBy('sequence');
+    }
+
+    /**
+     * Tugas yang ditagihkan di invoice ini.
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Invoice yang boleh dilihat pengguna: kliennya terlihat (App\Support\Access).
+     *
+     * @param  Builder<Invoice>  $query
+     * @return Builder<Invoice>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = Access::clientIds($user);
+
+        return $ids === null ? $query : $query->whereIn($query->qualifyColumn('client_id'), $ids);
     }
 
     /**

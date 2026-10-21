@@ -3,16 +3,16 @@ import type { FormEvent } from 'react';
 import { useEffect } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    ResponsiveDialog,
+    ResponsiveDialogContent,
+    ResponsiveDialogDescription,
+    ResponsiveDialogFooter,
+    ResponsiveDialogHeader,
+    ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
 import {
     Select,
     SelectContent,
@@ -98,23 +98,25 @@ export function RecordPaymentDialog({
     const overLimit = amount > remaining;
 
     return (
-        <Dialog
+        <ResponsiveDialog
             open={open}
             onOpenChange={(v) => !form.processing && onOpenChange(v)}
         >
-            <DialogContent className="sm:max-w-md">
+            <ResponsiveDialogContent className="sm:max-w-md">
                 <form onSubmit={submit} className="grid gap-5">
-                    <DialogHeader>
-                        <DialogTitle>Catat pembayaran</DialogTitle>
-                        <DialogDescription>
+                    <ResponsiveDialogHeader>
+                        <ResponsiveDialogTitle>
+                            Catat pembayaran
+                        </ResponsiveDialogTitle>
+                        <ResponsiveDialogDescription>
                             Untuk pembayaran di luar QRIS, mis. transfer bank
                             atau tunai. Sisa tagihan{' '}
                             <span className="font-medium text-foreground tabular-nums">
                                 {formatIDR(remaining)}
                             </span>
                             .
-                        </DialogDescription>
-                    </DialogHeader>
+                        </ResponsiveDialogDescription>
+                    </ResponsiveDialogHeader>
 
                     {openSchedules.length > 0 && (
                         <div className="grid gap-2">
@@ -232,7 +234,7 @@ export function RecordPaymentDialog({
                         <InputError message={form.errors.notes} />
                     </div>
 
-                    <DialogFooter className="gap-2">
+                    <ResponsiveDialogFooter className="gap-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -250,9 +252,9 @@ export function RecordPaymentDialog({
                             {form.processing && <Spinner />}
                             Simpan pembayaran
                         </Button>
-                    </DialogFooter>
+                    </ResponsiveDialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </ResponsiveDialogContent>
+        </ResponsiveDialog>
     );
 }

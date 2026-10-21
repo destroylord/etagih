@@ -1,4 +1,5 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
@@ -10,6 +11,7 @@ const SEGMENT_LABEL: Record<string, string> = {
     projects: 'Proyek',
     products: 'Produk & Layanan',
     'time-tracker': 'Time Tracker',
+    tasks: 'Task',
     reports: 'Laporan',
     settings: 'Pengaturan',
     invoice: 'Invoice',
@@ -43,12 +45,24 @@ export function AppSidebarHeader({
 }) {
     const auto = useAutoBreadcrumbs();
     const items = breadcrumbs.length > 0 ? breadcrumbs : auto;
+    const current = items[items.length - 1];
 
     return (
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border/50 bg-background/80 px-4 backdrop-blur transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border/50 bg-background/80 px-3 backdrop-blur transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 supports-[backdrop-filter]:bg-background/60 md:h-14 md:px-4">
             <div className="flex min-w-0 items-center gap-2">
-                <SidebarTrigger className="-ml-1" />
-                <Breadcrumbs breadcrumbs={items} />
+                <SidebarTrigger className="-ml-1 size-9 md:size-7" />
+                {/* Mobile: cukup judul halaman (item breadcrumb terakhir). */}
+                {current && (
+                    <span className="truncate text-sm font-medium md:hidden">
+                        {current.title}
+                    </span>
+                )}
+                <div className="hidden min-w-0 md:block">
+                    <Breadcrumbs breadcrumbs={items} />
+                </div>
+            </div>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+                <NotificationBell />
             </div>
         </header>
     );

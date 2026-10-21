@@ -99,6 +99,15 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        // Undangan anggota tim: tabel token sama, tetapi berlaku 7 hari.
+        // Token undangan harus dibuat & divalidasi lewat broker ini.
+        'invites' => [
+            'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 10080,
+            'throttle' => 60,
+        ],
     ],
 
     /*

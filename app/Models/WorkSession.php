@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\Access;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $user_id
  * @property int $client_id
  * @property int|null $project_id
+ * @property int|null $task_id
  * @property int|null $invoice_id
  * @property int|null $invoice_item_id
  * @property string $description
@@ -24,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read User|null $user
  * @property-read Client $client
  * @property-read Project|null $project
+ * @property-read Task|null $task
  * @property-read Invoice|null $invoice
  * @property-read InvoiceItem|null $invoiceItem
  */
@@ -31,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'user_id',
     'client_id',
     'project_id',
+    'task_id',
     'invoice_id',
     'invoice_item_id',
     'description',
@@ -77,6 +82,35 @@ class WorkSession extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * Tugas yang dikerjakan di sesi ini (opsional).
+     *
+     * @return BelongsTo<Task, $this>
+     */
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class)->withTrashed();
+    }
+
+    /**
+     * Sesi yang boleh dilihat pengguna: admin semua; staf sesi miliknya
+     * sendiri + sesi di proyek yang ia ikuti (App\Support\Access).
+     *
+     * @param  Builder<WorkSession>  $query
+     * @return Builder<WorkSession>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = Access::projectIds($user);
+        if ($ids === null) {
+            return $query;
+        }
+
+        return $query->where(fn (Builder $q) => $q
+            ->where($q->qualifyColumn('user_id'), $user->id)
+            ->orWhereIn($q->qualifyColumn('project_id'), $ids));
     }
 
     /**

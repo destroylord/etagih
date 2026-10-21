@@ -1006,7 +1006,8 @@ export default function SettingsInvoice({
                 {/* Bar simpan */}
                 <div
                     className={cn(
-                        'sticky bottom-0 z-10 -mx-1 flex items-center justify-between gap-3 rounded-xl border bg-background/95 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80',
+                        // Mobile: tepat di atas bottom nav.
+                        'sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 flex items-center justify-between gap-3 rounded-xl border bg-background/95 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80 md:bottom-0',
                     )}
                 >
                     <p

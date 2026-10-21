@@ -23,19 +23,19 @@ export function DataPagination<T>({
     const next = paginator.links[paginator.links.length - 1]?.url;
 
     return (
-        <div className="flex flex-col items-center justify-between gap-3 border-t px-4 py-3 text-sm sm:flex-row">
-            <p className="text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm">
+            <p className="min-w-0 truncate text-muted-foreground">
                 {paginator.from}–{paginator.to} dari {paginator.total} {noun}
             </p>
             {paginator.last_page > 1 && (
                 <nav
-                    className="flex items-center gap-1"
-                    aria-label="Pagination"
+                    className="flex shrink-0 items-center gap-1"
+                    aria-label="Navigasi halaman"
                 >
                     <Button
                         variant="outline"
                         size="icon"
-                        className="size-8"
+                        className="size-10 sm:size-8"
                         disabled={!prev}
                         asChild={!!prev}
                     >
@@ -53,13 +53,17 @@ export function DataPagination<T>({
                             </span>
                         )}
                     </Button>
+                    {/* Mobile: cukup "2 / 5" di antara tombol prev/next. */}
+                    <span className="px-2 text-muted-foreground tabular-nums sm:hidden">
+                        {paginator.current_page} / {paginator.last_page}
+                    </span>
                     {pages.map((link, i) =>
                         link.url ? (
                             <Button
                                 key={i}
                                 variant={link.active ? 'default' : 'ghost'}
                                 size="icon"
-                                className="size-8"
+                                className="hidden size-8 sm:inline-flex"
                                 asChild
                             >
                                 <Link href={link.url} preserveScroll>
@@ -69,7 +73,7 @@ export function DataPagination<T>({
                         ) : (
                             <span
                                 key={i}
-                                className="px-1 text-muted-foreground"
+                                className="hidden px-1 text-muted-foreground sm:inline"
                             >
                                 …
                             </span>
@@ -78,7 +82,7 @@ export function DataPagination<T>({
                     <Button
                         variant="outline"
                         size="icon"
-                        className="size-8"
+                        className="size-10 sm:size-8"
                         disabled={!next}
                         asChild={!!next}
                     >

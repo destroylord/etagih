@@ -45,6 +45,19 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                // Hak akses turunan role (lihat App\Support\Access): staf hanya
+                // boleh membuat sub-proyek & tugas di proyek yang ia ikuti.
+                'can' => fn () => $request->user() instanceof User ? [
+                    'manageClients' => $request->user()->isAdmin(),
+                    'manageProjects' => $request->user()->isAdmin(),
+                    'manageMembers' => $request->user()->isAdmin(),
+                    'createSubProjects' => true,
+                    'createTasks' => true,
+                ] : null,
+                // Jumlah notifikasi belum dibaca (lonceng).
+                'unreadNotifications' => fn () => $request->user() instanceof User
+                    ? $request->user()->unreadNotifications()->count()
+                    : 0,
             ],
             // Kunci portal klien yang baru dibuat — hanya ada di request setelah dibuat.
             'newAccessKey' => fn () => $request->hasSession() ? $request->session()->get('access_key') : null,

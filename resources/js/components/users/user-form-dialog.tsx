@@ -39,8 +39,8 @@ type UserFormData = {
 const PASSWORD_MODES: { value: PasswordMode; title: string; hint: string }[] = [
     {
         value: 'invite',
-        title: 'Kirim email untuk mengatur password',
-        hint: 'Pengguna menerima tautan dan memilih password sendiri.',
+        title: 'Kirim undangan via email (berlaku 7 hari)',
+        hint: 'Pengguna menerima tautan undangan dan membuat password sendiri.',
     },
     {
         value: 'temporary',

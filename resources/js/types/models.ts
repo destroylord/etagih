@@ -107,6 +107,9 @@ export type WorkSession = {
     status: 'running' | 'paused' | 'completed' | 'billed' | 'cancelled';
     notes: string | null;
     client?: Pick<Client, 'id' | 'name'> | null;
+    /** Tugas yang dikerjakan di sesi ini (opsional). */
+    task_id?: number | null;
+    task?: { id: number; title: string } | null;
 };
 
 export type InvoiceItem = {
@@ -123,6 +126,9 @@ export type InvoiceItem = {
     sort_order: number;
     product?: Pick<Product, 'id' | 'name'> | null;
     sessions?: WorkSession[];
+    /** Tugas yang ditagihkan lewat item ini. */
+    task_id?: number | null;
+    task?: { id: number; title: string } | null;
 };
 
 export type PaymentSchedule = {

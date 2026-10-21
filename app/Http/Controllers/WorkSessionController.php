@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Invoice\WorkSessionAction;
+use App\Actions\WorkSession\StartWorkSession;
 use App\Models\Client;
 use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
 use App\Models\WorkSession;
+use App\Support\Access;
 use App\Support\Settings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +22,12 @@ class WorkSessionController extends Controller
 {
     public function index(Request $request, WorkSessionAction $action): Response
     {
-        $query = WorkSession::with(['client', 'project.parent', 'user:id,name'])
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        // Staf: sesi miliknya + sesi di proyek yang ia ikuti.
+        $query = WorkSession::with(['client', 'project.parent', 'user:id,name', 'task:id,title'])
+            ->visibleTo($user)
             ->latest('started_at');
 
         if ($request->filled('project_id')) {
@@ -49,8 +58,8 @@ class WorkSessionController extends Controller
         $sessions = $query->paginate(20)->withQueryString();
 
         // Active = running ATAU paused milik pengguna yang login (tracker per pengguna).
-        $active = WorkSession::with(['client', 'project.parent', 'user:id,name'])
-            ->where('user_id', $request->user()?->id)
+        $active = WorkSession::with(['client', 'project.parent', 'user:id,name', 'task:id,title'])
+            ->where('user_id', $user->id)
             ->whereIn('status', ['running', 'paused'])
             ->latest('started_at')
             ->first();
@@ -58,8 +67,10 @@ class WorkSessionController extends Controller
         return Inertia::render('time-tracker', [
             'sessions' => $sessions,
             'active' => $active,
-            'clients' => Client::orderBy('name')->get(['id', 'name', 'hourly_rate']),
-            'projects' => self::projectOptions(),
+            'clients' => Client::visibleTo($user)->orderBy('name')->get(['id', 'name', 'hourly_rate']),
+            'projects' => self::projectOptions(false, $user),
+            // Tugas terbuka yang terlihat (milik saya lebih dulu) untuk pilihan "Kerjakan tugas".
+            'tasks' => self::taskOptions($user),
             'filters' => $request->only(['client_id', 'project_id', 'status', 'date_from', 'date_to']),
             'defaultRate' => (float) Settings::current()->default_hourly_rate,
             'totals' => [
@@ -75,26 +86,51 @@ class WorkSessionController extends Controller
      * Semua mutasi return JSON kalau diminta fetch (offline sync), redirect
      * kalau form biasa. Sama polanya dgn PaymentController::pay.
      */
-    public function start(Request $request, WorkSessionAction $action): JsonResponse|RedirectResponse
+    public function start(Request $request, WorkSessionAction $action, StartWorkSession $starter): JsonResponse|RedirectResponse
     {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
         $data = $request->validate([
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            // Dengan task_id: klien & proyek diambil dari proyek tugas.
+            'task_id' => ['nullable', 'integer', Rule::exists('tasks', 'id')->whereNull('deleted_at')],
+            'client_id' => ['required_without:task_id', 'nullable', 'integer', 'exists:clients,id'],
             // Proyek / sub-proyek opsional, harus milik klien yang dipilih.
             'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')->where('client_id', $request->integer('client_id'))],
-            'description' => ['required', 'string', 'max:255'],
-            'unit_price' => ['required', 'numeric', 'min:0'],
+            'description' => ['required_without:task_id', 'nullable', 'string', 'max:255'],
+            'unit_price' => ['required_without:task_id', 'nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $task = isset($data['task_id']) ? Task::query()->find((int) $data['task_id']) : null;
+
+        // Staf hanya boleh mencatat waktu di klien / proyek / tugas yang terlihat.
+        if ($task) {
+            if ($user->cannot('view', $task)) {
+                return $this->fail($request, 'Anda tidak punya akses ke tugas ini.', 403);
+            }
+        } elseif (! Access::canSeeClient($user, (int) $data['client_id'])
+            || (isset($data['project_id']) && ! Access::canSeeProject($user, (int) $data['project_id']))) {
+            return $this->fail($request, 'Anda tidak punya akses ke klien / proyek ini.', 403);
+        }
+
         try {
-            $session = $action->start(
-                userId: (int) $request->user()?->id,
-                clientId: $data['client_id'],
-                projectId: isset($data['project_id']) ? (int) $data['project_id'] : null,
-                description: $data['description'],
-                unitPrice: (float) $data['unit_price'],
-                notes: $data['notes'] ?? null,
-            );
+            $session = $task
+                ? $starter->forTask(
+                    user: $user,
+                    task: $task,
+                    description: $data['description'] ?? null,
+                    unitPrice: isset($data['unit_price']) ? (float) $data['unit_price'] : null,
+                    notes: $data['notes'] ?? null,
+                )
+                : $action->start(
+                    userId: $user->id,
+                    clientId: (int) $data['client_id'],
+                    projectId: isset($data['project_id']) ? (int) $data['project_id'] : null,
+                    description: (string) $data['description'],
+                    unitPrice: (float) $data['unit_price'],
+                    notes: $data['notes'] ?? null,
+                );
         } catch (\RuntimeException $e) {
             return $this->fail($request, $e->getMessage(), 409);
         }
@@ -207,14 +243,46 @@ class WorkSessionController extends Controller
     }
 
     /**
-     * Proyek aktif untuk pilihan di form (klien, induk, tarif).
+     * Tugas terbuka yang terlihat pengguna, tugas miliknya lebih dulu (maks. 200).
+     *
+     * @return list<array{id: int, title: string, status: string, project_id: int, client_id: int, project_name: string, assignee_id: int|null, due_date: string|null}>
+     */
+    public static function taskOptions(User $user): array
+    {
+        return array_values(Task::query()
+            ->visibleTo($user)
+            ->open()
+            ->with(['project.parent:id,name'])
+            ->orderByRaw('CASE WHEN assignee_id = ? THEN 0 ELSE 1 END', [$user->id])
+            ->orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('due_date')
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->map(fn (Task $t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'status' => $t->status,
+                'project_id' => $t->project_id,
+                'client_id' => $t->project->client_id,
+                'project_name' => $t->project->full_name,
+                'assignee_id' => $t->assignee_id,
+                'due_date' => $t->due_date?->toDateString(),
+            ])
+            ->all());
+    }
+
+    /**
+     * Proyek aktif untuk pilihan di form (klien, induk, tarif). Dengan `$user`,
+     * hanya proyek yang terlihat oleh pengguna itu (staf: proyek yang diikuti).
      *
      * @return list<array{id: int, client_id: int, client_name: string, parent_id: int|null, name: string, full_name: string, hourly_rate: string|null, status: string}>
      */
-    public static function projectOptions(bool $includeInactive = false): array
+    public static function projectOptions(bool $includeInactive = false, ?User $user = null): array
     {
         return array_values(Project::query()
             ->with(['parent:id,name', 'client:id,name'])
+            ->when($user !== null, fn ($q) => $q->visibleTo($user))
             ->when(! $includeInactive, fn ($q) => $q->where('status', '!=', 'archived'))
             ->orderBy('name')
             ->get()

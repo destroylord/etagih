@@ -30,17 +30,17 @@ const sidebarNavItems: NavItem[] = [
         roles: ['admin'],
     },
     {
-        title: 'Profile',
+        title: 'Profil',
         href: edit(),
         icon: null,
     },
     {
-        title: 'Security',
+        title: 'Keamanan',
         href: editSecurity(),
         icon: null,
     },
     {
-        title: 'Appearance',
+        title: 'Tampilan',
         href: editAppearance(),
         icon: null,
     },
@@ -66,17 +66,18 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     ].some((p) => currentUrl.startsWith(p));
 
     return (
-        <div className="px-4 py-6">
+        <div className="px-4 py-5 sm:py-6">
             <Heading
                 title="Pengaturan"
                 description="Atur invoice, profil, keamanan, dan tampilan aplikasi"
             />
 
             <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
+                {/* Mobile/tablet: tab horizontal yang bisa digeser. */}
+                <aside className="-mx-4 w-auto lg:mx-0 lg:w-48 lg:shrink-0">
                     <nav
-                        className="flex flex-col space-y-1 space-x-0"
-                        aria-label="Settings"
+                        className="flex [scrollbar-width:none] gap-1 overflow-x-auto px-4 lg:flex-col lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden"
+                        aria-label="Menu pengaturan"
                     >
                         {navItems.map((item, index) => (
                             <Button
@@ -84,11 +85,23 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                 size="sm"
                                 variant="ghost"
                                 asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
-                                })}
+                                className={cn(
+                                    'h-9 shrink-0 justify-start lg:h-8 lg:w-full',
+                                    {
+                                        'bg-muted': isCurrentOrParentUrl(
+                                            item.href,
+                                        ),
+                                    },
+                                )}
                             >
-                                <Link href={item.href}>
+                                <Link
+                                    href={item.href}
+                                    aria-current={
+                                        isCurrentOrParentUrl(item.href)
+                                            ? 'page'
+                                            : undefined
+                                    }
+                                >
                                     {item.icon && (
                                         <item.icon className="h-4 w-4" />
                                     )}
@@ -99,7 +112,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     </nav>
                 </aside>
 
-                <Separator className="my-6 lg:hidden" />
+                <Separator className="my-4 lg:hidden" />
 
                 {/* Halaman pengaturan invoice butuh ruang lebih untuk preview template. */}
                 <div

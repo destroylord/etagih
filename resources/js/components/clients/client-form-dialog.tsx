@@ -2,16 +2,16 @@ import { useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    ResponsiveDialog,
+    ResponsiveDialogContent,
+    ResponsiveDialogDescription,
+    ResponsiveDialogFooter,
+    ResponsiveDialogHeader,
+    ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { toNumber } from '@/lib/format';
@@ -76,21 +76,21 @@ export function ClientFormDialog({
     });
 
     return (
-        <Dialog
+        <ResponsiveDialog
             open={open}
             onOpenChange={(v) => !form.processing && onOpenChange(v)}
         >
-            <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>
+            <ResponsiveDialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+                <ResponsiveDialogHeader>
+                    <ResponsiveDialogTitle>
                         {isEdit ? 'Edit klien' : 'Tambah klien'}
-                    </DialogTitle>
-                    <DialogDescription>
+                    </ResponsiveDialogTitle>
+                    <ResponsiveDialogDescription>
                         {isEdit
                             ? 'Perbarui data kontak dan tarif klien.'
                             : 'Kunci akses portal dibuat otomatis dan ditampilkan sekali setelah klien disimpan.'}
-                    </DialogDescription>
-                </DialogHeader>
+                    </ResponsiveDialogDescription>
+                </ResponsiveDialogHeader>
 
                 <form onSubmit={submit} className="grid gap-4" noValidate>
                     <div className="grid gap-2">
@@ -177,7 +177,7 @@ export function ClientFormDialog({
                         <InputError message={form.errors.notes} />
                     </div>
 
-                    <DialogFooter className="gap-2 pt-2">
+                    <ResponsiveDialogFooter className="gap-2 pt-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -190,9 +190,9 @@ export function ClientFormDialog({
                             {form.processing && <Spinner />}
                             {isEdit ? 'Simpan perubahan' : 'Tambah klien'}
                         </Button>
-                    </DialogFooter>
+                    </ResponsiveDialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </ResponsiveDialogContent>
+        </ResponsiveDialog>
     );
 }

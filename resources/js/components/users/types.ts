@@ -6,6 +6,8 @@ export type ManagedUser = {
     email: string;
     role: UserRole;
     is_active: boolean;
+    status: UserStatus;
+    invited_at: string | null;
     two_factor_enabled: boolean;
     created_at: string | null;
     is_self: boolean;
@@ -15,9 +17,13 @@ export type ManagedUser = {
         deactivate: boolean;
         delete: boolean;
         reset_password: boolean;
+        resend_invitation: boolean;
         transfer_ownership: boolean;
     };
 };
+
+/** pending = diundang lewat email, belum membuat password. */
+export type UserStatus = 'pending' | 'active' | 'inactive';
 
 export type TemporaryPassword = {
     user_id: number;

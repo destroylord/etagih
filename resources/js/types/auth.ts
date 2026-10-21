@@ -1,3 +1,5 @@
+import type { AuthCan } from './tasks';
+
 export type User = {
     id: number;
     name: string;
@@ -12,6 +14,10 @@ export type User = {
 
 export type Auth = {
     user: User;
+    /** Hak akses turunan role (HandleInertiaRequests); null bila tamu. */
+    can?: AuthCan | null;
+    /** Jumlah notifikasi belum dibaca (lonceng). */
+    unreadNotifications?: number;
 };
 
 /* @chisel-passkeys */

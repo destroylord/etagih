@@ -1,5 +1,6 @@
 import { FolderKanban, X } from 'lucide-react';
 import { statusLabel } from '@/components/invoice-status-badge';
+import { FilterSheet } from '@/components/mobile/filter-sheet';
 import { ProjectSelect } from '@/components/projects/project-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,133 +99,146 @@ export function SessionFilters({
     onReset: () => void;
 }) {
     const hasFilter = Object.values(filters).some((v) => v);
+    const activeCount = Object.values(filters).filter((v) => v).length;
     const clientId = filters.client_id ? Number(filters.client_id) : null;
     const projectId = filters.project_id ? Number(filters.project_id) : null;
     const setProject = (id: number | null) =>
         onChange({ project_id: id ? String(id) : '' });
 
     return (
-        <div className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_9.5rem_9.5rem_auto]">
-            <div className="grid gap-1.5">
-                <Label
-                    htmlFor="f-client"
-                    className="text-xs text-muted-foreground"
-                >
-                    Client
-                </Label>
-                <Select
-                    value={filters.client_id || 'all'}
-                    onValueChange={(v) =>
-                        // Proyek milik client lama tidak relevan lagi.
-                        onChange({
-                            client_id: v === 'all' ? '' : v,
-                            project_id: '',
-                        })
-                    }
-                >
-                    <SelectTrigger id="f-client" className="w-full">
-                        <SelectValue placeholder="Semua client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Semua client</SelectItem>
-                        {clients.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                                {c.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="grid gap-1.5">
-                <Label
-                    htmlFor="f-project"
-                    className="text-xs text-muted-foreground"
-                >
-                    Proyek
-                </Label>
-                {clientId ? (
-                    <ProjectSelect
-                        id="f-project"
-                        projects={projects}
-                        clientId={clientId}
-                        value={projectId}
-                        onChange={(id) => setProject(id)}
-                        emptyLabel="Semua proyek"
+        // Mobile: kontrol filter diringkas jadi tombol "Filter" + bottom sheet.
+        <div className="border-b p-3 md:border-0 md:p-0">
+            <FilterSheet
+                activeCount={activeCount}
+                onReset={hasFilter ? onReset : undefined}
+                className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_9.5rem_9.5rem_auto]"
+            >
+                <div className="grid gap-1.5">
+                    <Label
+                        htmlFor="f-client"
+                        className="text-xs text-muted-foreground"
+                    >
+                        Client
+                    </Label>
+                    <Select
+                        value={filters.client_id || 'all'}
+                        onValueChange={(v) =>
+                            // Proyek milik client lama tidak relevan lagi.
+                            onChange({
+                                client_id: v === 'all' ? '' : v,
+                                project_id: '',
+                            })
+                        }
+                    >
+                        <SelectTrigger id="f-client" className="w-full">
+                            <SelectValue placeholder="Semua client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua client</SelectItem>
+                            {clients.map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                    {c.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-1.5">
+                    <Label
+                        htmlFor="f-project"
+                        className="text-xs text-muted-foreground"
+                    >
+                        Proyek
+                    </Label>
+                    {clientId ? (
+                        <ProjectSelect
+                            id="f-project"
+                            projects={projects}
+                            clientId={clientId}
+                            value={projectId}
+                            onChange={(id) => setProject(id)}
+                            emptyLabel="Semua proyek"
+                        />
+                    ) : (
+                        <AllProjectsSelect
+                            id="f-project"
+                            projects={projects}
+                            clients={clients}
+                            value={projectId}
+                            onChange={setProject}
+                        />
+                    )}
+                </div>
+                <div className="grid gap-1.5">
+                    <Label
+                        htmlFor="f-status"
+                        className="text-xs text-muted-foreground"
+                    >
+                        Status
+                    </Label>
+                    <Select
+                        value={filters.status || 'all'}
+                        onValueChange={(v) =>
+                            onChange({ status: v === 'all' ? '' : v })
+                        }
+                    >
+                        <SelectTrigger id="f-status" className="w-full">
+                            <SelectValue placeholder="Semua status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua status</SelectItem>
+                            {STATUSES.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                    {statusLabel(s)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-1.5">
+                    <Label
+                        htmlFor="f-from"
+                        className="text-xs text-muted-foreground"
+                    >
+                        Dari tanggal
+                    </Label>
+                    <Input
+                        id="f-from"
+                        type="date"
+                        value={filters.date_from ?? ''}
+                        max={filters.date_to || undefined}
+                        onChange={(e) =>
+                            onChange({ date_from: e.target.value })
+                        }
                     />
+                </div>
+                <div className="grid gap-1.5">
+                    <Label
+                        htmlFor="f-to"
+                        className="text-xs text-muted-foreground"
+                    >
+                        Sampai tanggal
+                    </Label>
+                    <Input
+                        id="f-to"
+                        type="date"
+                        value={filters.date_to ?? ''}
+                        min={filters.date_from || undefined}
+                        onChange={(e) => onChange({ date_to: e.target.value })}
+                    />
+                </div>
+                {hasFilter ? (
+                    <Button
+                        variant="ghost"
+                        onClick={onReset}
+                        className="hidden justify-self-start md:inline-flex"
+                    >
+                        <X /> Reset
+                    </Button>
                 ) : (
-                    <AllProjectsSelect
-                        id="f-project"
-                        projects={projects}
-                        clients={clients}
-                        value={projectId}
-                        onChange={setProject}
-                    />
+                    <span className="hidden xl:block" />
                 )}
-            </div>
-            <div className="grid gap-1.5">
-                <Label
-                    htmlFor="f-status"
-                    className="text-xs text-muted-foreground"
-                >
-                    Status
-                </Label>
-                <Select
-                    value={filters.status || 'all'}
-                    onValueChange={(v) =>
-                        onChange({ status: v === 'all' ? '' : v })
-                    }
-                >
-                    <SelectTrigger id="f-status" className="w-full">
-                        <SelectValue placeholder="Semua status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Semua status</SelectItem>
-                        {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                                {statusLabel(s)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="grid gap-1.5">
-                <Label
-                    htmlFor="f-from"
-                    className="text-xs text-muted-foreground"
-                >
-                    Dari tanggal
-                </Label>
-                <Input
-                    id="f-from"
-                    type="date"
-                    value={filters.date_from ?? ''}
-                    max={filters.date_to || undefined}
-                    onChange={(e) => onChange({ date_from: e.target.value })}
-                />
-            </div>
-            <div className="grid gap-1.5">
-                <Label htmlFor="f-to" className="text-xs text-muted-foreground">
-                    Sampai tanggal
-                </Label>
-                <Input
-                    id="f-to"
-                    type="date"
-                    value={filters.date_to ?? ''}
-                    min={filters.date_from || undefined}
-                    onChange={(e) => onChange({ date_to: e.target.value })}
-                />
-            </div>
-            {hasFilter ? (
-                <Button
-                    variant="ghost"
-                    onClick={onReset}
-                    className="justify-self-start"
-                >
-                    <X /> Reset
-                </Button>
-            ) : (
-                <span className="hidden xl:block" />
-            )}
+            </FilterSheet>
         </div>
     );
 }

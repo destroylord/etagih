@@ -15,6 +15,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->command?->info('Tidak ada data awal. Buka /setup atau jalankan `php artisan app:create-admin`.');
+        $this->command->info('Tidak ada data awal. Buka /setup atau jalankan `php artisan app:create-admin`.');
     }
 }

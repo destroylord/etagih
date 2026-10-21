@@ -44,6 +44,10 @@ export type ItemRow = {
     session_ids: number[];
     /** Sub-proyek baris (null = ikut proyek invoice / tanpa proyek). */
     project_id: number | null;
+    /** Tugas yang ditagihkan lewat baris ini (null = bukan dari tugas). */
+    task_id: number | null;
+    /** Judul tugas untuk badge (tidak dikirim). */
+    task_title?: string;
 };
 
 export type InvoiceFormData = {
@@ -82,6 +86,7 @@ export const blankRow = (overrides: Partial<ItemRow> = {}): ItemRow => ({
     hours_qty: '',
     session_ids: [],
     project_id: null,
+    task_id: null,
     ...overrides,
 });
 
@@ -164,6 +169,7 @@ export function lineTotal(
 /** Baris yang benar-benar kosong dibuang saat submit. */
 export const isBlankRow = (row: ItemRow) =>
     row.product_id === null &&
+    row.task_id === null &&
     row.session_ids.length === 0 &&
     row.description.trim() === '' &&
     toNumber(row.unit_price) === 0 &&

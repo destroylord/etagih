@@ -1,5 +1,5 @@
-import { Link } from '@inertiajs/react';
-import { Play, Timer } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { Lock, Play, Timer } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { ProjectSelect } from '@/components/projects/project-select';
@@ -10,13 +10,16 @@ import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatIDR, toNumber } from '@/lib/format';
 import type { ProjectOption } from '@/types/models';
+import type { TimeTrackerTaskOption } from '@/types/tasks';
 import type { TrackerClient } from './types';
 
 export type StartPayload = {
@@ -28,7 +31,11 @@ export type StartPayload = {
     description: string;
     unitPrice: number;
     notes: string | null;
+    /** Tugas yang dikerjakan (klien & proyek mengikuti tugas). */
+    task: { id: number; title: string } | null;
 };
+
+const NO_TASK = 'none';
 
 type RateSource = 'default' | 'client' | 'project' | 'parent';
 
@@ -80,6 +87,7 @@ function resolveRate(
 export function StartSessionForm({
     clients,
     projects,
+    tasks = [],
     defaultRate,
     busy,
     onStart,
@@ -88,6 +96,8 @@ export function StartSessionForm({
 }: {
     clients: TrackerClient[];
     projects: ProjectOption[];
+    /** Tugas terbuka yang bisa dipilih (opsional). */
+    tasks?: TimeTrackerTaskOption[];
     defaultRate: number;
     busy: boolean;
     onStart: (payload: StartPayload) => void;
@@ -125,6 +135,22 @@ export function StartSessionForm({
     const [rateEdited, setRateEdited] = useState(false);
     const [notes, setNotes] = useState('');
     const [showNotes, setShowNotes] = useState(false);
+    const [taskId, setTaskId] = useState<number | null>(null);
+
+    const userId = (usePage().props.auth?.user as { id?: number } | null)?.id;
+    const task =
+        taskId !== null ? tasks.find((t) => t.id === taskId) : undefined;
+    const myTasks = tasks.filter(
+        (t) => userId !== undefined && t.assignee_id === userId,
+    );
+    const otherTasks = tasks.filter((t) => !myTasks.includes(t));
+    const taskGroups = [
+        { label: 'Ditugaskan ke saya', items: myTasks },
+        {
+            label: myTasks.length > 0 ? 'Task lain' : 'Task',
+            items: otherTasks,
+        },
+    ].filter((g) => g.items.length > 0);
 
     const applyRate = (cid: number | null, pid: number | null) => {
         if (rateEdited) {
@@ -147,6 +173,32 @@ export function StartSessionForm({
         applyRate(clientId ? Number(clientId) : null, id);
     };
 
+    /** Pilih tugas: klien, proyek & uraian mengikuti tugas (klien/proyek dikunci). */
+    const pickTask = (value: string) => {
+        const next =
+            value === NO_TASK
+                ? undefined
+                : tasks.find((t) => t.id === Number(value));
+        const previousTitle = task?.title;
+        setTaskId(next ? next.id : null);
+
+        if (!next) {
+            if (description === previousTitle) {
+                setDescription('');
+            }
+
+            return;
+        }
+
+        setClientId(String(next.client_id));
+        setProjectId(next.project_id);
+        applyRate(next.client_id, next.project_id);
+
+        if (description.trim() === '' || description === previousTitle) {
+            setDescription(next.title);
+        }
+    };
+
     const canSubmit =
         !!clientId &&
         description.trim() !== '' &&
@@ -166,12 +218,14 @@ export function StartSessionForm({
         onStart({
             clientId: Number(clientId),
             clientName: c?.name ?? '',
-            projectId: p ? p.id : null,
-            projectName: p ? p.full_name : null,
+            projectId: p ? p.id : (task?.project_id ?? null),
+            projectName: p ? p.full_name : (task?.project_name ?? null),
             description: description.trim(),
             unitPrice: toNumber(rate),
             notes: notes.trim() || null,
+            task: task ? { id: task.id, title: task.title } : null,
         });
+        setTaskId(null);
         setDescription('');
         setNotes('');
         setShowNotes(false);
@@ -179,7 +233,7 @@ export function StartSessionForm({
 
     if (clients.length === 0) {
         return (
-            <Card className="flex-row items-center justify-between gap-4 border-dashed p-5">
+            <Card className="flex-col items-start justify-between gap-4 border-dashed p-5 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     <Timer className="size-5 shrink-0" />
                     Tambahkan client terlebih dahulu sebelum mulai mencatat
@@ -210,10 +264,62 @@ export function StartSessionForm({
                     </div>
                 </div>
 
+                {tasks.length > 0 && (
+                    <div className="grid gap-2 md:max-w-xl">
+                        <Label htmlFor="tt-task">
+                            Task{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (opsional)
+                            </span>
+                        </Label>
+                        <Select
+                            value={taskId !== null ? String(taskId) : NO_TASK}
+                            onValueChange={pickTask}
+                        >
+                            <SelectTrigger id="tt-task" className="w-full">
+                                <SelectValue placeholder="Tanpa task" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={NO_TASK}>
+                                    Tanpa task
+                                </SelectItem>
+                                {taskGroups.map((g) => (
+                                    <SelectGroup key={g.label}>
+                                        <SelectLabel>{g.label}</SelectLabel>
+                                        {g.items.map((t) => (
+                                            <SelectItem
+                                                key={t.id}
+                                                value={String(t.id)}
+                                            >
+                                                <span className="truncate">
+                                                    {t.title}
+                                                </span>
+                                                <span className="truncate text-xs text-muted-foreground">
+                                                    · {t.project_name}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {task && (
+                            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Lock className="size-3 shrink-0" />
+                                Client &amp; proyek mengikuti task ini.
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_10rem]">
                     <div className="grid gap-2">
                         <Label htmlFor="tt-client">Client</Label>
-                        <Select value={clientId} onValueChange={pickClient}>
+                        <Select
+                            value={clientId}
+                            onValueChange={pickClient}
+                            disabled={!!task}
+                        >
                             <SelectTrigger id="tt-client" className="w-full">
                                 <SelectValue placeholder="Pilih client" />
                             </SelectTrigger>
@@ -239,6 +345,7 @@ export function StartSessionForm({
                             clientId={clientId ? Number(clientId) : null}
                             value={projectId}
                             onChange={(id) => pickProject(id)}
+                            disabled={!!task}
                         />
                     </div>
                     <div className="grid gap-2">
@@ -312,7 +419,7 @@ export function StartSessionForm({
                     <Button
                         type="submit"
                         disabled={!canSubmit}
-                        className="sm:min-w-32"
+                        className="h-11 sm:h-9 sm:min-w-32"
                     >
                         <Play /> Mulai
                     </Button>

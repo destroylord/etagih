@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $invoice_id
  * @property int|null $product_id
  * @property int|null $project_id
+ * @property int|null $task_id
  * @property string $description
  * @property string $unit_price
  * @property string|null $manual_hours
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Invoice $invoice
  * @property-read Product|null $product
  * @property-read Project|null $project
+ * @property-read Task|null $task
  * @property-read Collection<int, WorkSession> $sessions
  */
 class InvoiceItem extends Model
@@ -33,6 +35,7 @@ class InvoiceItem extends Model
         'invoice_id',
         'product_id',
         'project_id',
+        'task_id',
         'description',
         'unit_price',
         'manual_hours',
@@ -71,6 +74,16 @@ class InvoiceItem extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * Tugas asal item ini (opsional).
+     *
+     * @return BelongsTo<Task, $this>
+     */
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class)->withTrashed();
     }
 
     /**

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Support\Access;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -25,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, Project> $children
  * @property-read Collection<int, Invoice> $invoices
  * @property-read Collection<int, WorkSession> $workSessions
+ * @property-read Collection<int, User> $members
+ * @property-read Collection<int, Task> $tasks
  */
 #[Fillable(['client_id', 'parent_id', 'name', 'description', 'status', 'hourly_rate'])]
 class Project extends Model
@@ -81,6 +85,37 @@ class Project extends Model
     }
 
     /**
+     * Anggota tim (hanya bermakna di proyek utama; sub-proyek mewarisi dari induknya).
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'project_members')->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Proyek yang boleh dilihat pengguna (lihat App\Support\Access).
+     *
+     * @param  Builder<Project>  $query
+     * @return Builder<Project>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = Access::projectIds($user);
+
+        return $ids === null ? $query : $query->whereIn($query->qualifyColumn('id'), $ids);
+    }
+
+    /**
      * @param  Builder<Project>  $query
      * @return Builder<Project>
      */
@@ -126,13 +161,14 @@ class Project extends Model
         return $this->parent_id ? ($this->parent ?? $this) : $this;
     }
 
-    /** Masih dipakai invoice / item / sesi → tidak boleh dihapus (arsipkan saja). */
+    /** Masih dipakai invoice / item / sesi / tugas → tidak boleh dihapus (arsipkan saja). */
     public function isInUse(): bool
     {
         $ids = $this->selfAndChildIds();
 
         return Invoice::query()->whereIn('project_id', $ids)->exists()
             || InvoiceItem::query()->whereIn('project_id', $ids)->exists()
-            || WorkSession::query()->whereIn('project_id', $ids)->exists();
+            || WorkSession::query()->whereIn('project_id', $ids)->exists()
+            || Task::withTrashed()->whereIn('project_id', $ids)->exists();
     }
 }

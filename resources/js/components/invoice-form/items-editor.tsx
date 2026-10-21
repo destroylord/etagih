@@ -4,6 +4,7 @@ import {
     Clock,
     FolderKanban,
     ListPlus,
+    ListTodo,
     MoreHorizontal,
     Package,
     Plus,
@@ -36,6 +37,7 @@ const ROW_FIELDS = [
     'unit_price',
     'session_ids',
     'project_id',
+    'task_id',
 ] as const;
 
 /** Konfigurasi pilihan sub-proyek per baris (null = disembunyikan). */
@@ -153,8 +155,24 @@ export function ItemsEditor({
                                     <div className="min-w-0 flex-1 space-y-1.5">
                                         {(product ||
                                             fromSessions ||
-                                            rowProject) && (
+                                            rowProject ||
+                                            row.task_id !== null) && (
                                             <div className="flex flex-wrap items-center gap-1.5">
+                                                {row.task_id !== null && (
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="max-w-full gap-1 bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300"
+                                                        title="Baris dari tugas — hapus baris untuk melepas tugas"
+                                                    >
+                                                        <ListTodo className="size-3" />{' '}
+                                                        <span className="truncate">
+                                                            Task
+                                                            {row.task_title
+                                                                ? `: ${row.task_title}`
+                                                                : ''}
+                                                        </span>
+                                                    </Badge>
+                                                )}
                                                 {product && (
                                                     <Badge
                                                         variant="secondary"

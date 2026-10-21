@@ -15,6 +15,7 @@ export default function QuotesCreate({
     defaultValidDays = 14,
     preselectedClientId = null,
     preselectedProjectId = null,
+    canCreateClient = true,
 }: {
     clients: FormClient[];
     products: FormProduct[];
@@ -23,6 +24,7 @@ export default function QuotesCreate({
     defaultValidDays?: number;
     preselectedClientId?: number | null;
     preselectedProjectId?: number | null;
+    canCreateClient?: boolean;
 }) {
     const preselectedProject =
         projects.find((p) => p.id === preselectedProjectId) ?? null;
@@ -70,6 +72,7 @@ export default function QuotesCreate({
                     submitLabel="Simpan sebagai Draft"
                     cancelHref="/quotes"
                     defaultTaxRate={Number(defaultTaxRate) || 0}
+                    canCreateClient={canCreateClient}
                 />
             </PageContainer>
         </>

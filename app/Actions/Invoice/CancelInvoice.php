@@ -15,6 +15,7 @@ use RuntimeException;
  * - status → cancelled (tidak dihitung piutang, tidak kena reminder/overdue)
  * - QRIS pending di-expire supaya tidak bisa dibayar
  * - sessions Time Tracker dilepas kembali ke pool (completed)
+ * - tugas yang ditagihkan dilepas (invoice_id null)
  * - invoice berulang dihentikan
  */
 class CancelInvoice
@@ -47,6 +48,9 @@ class CancelInvoice
             WorkSession::where('invoice_id', $invoice->id)
                 ->where('status', 'billed')
                 ->update(['invoice_id' => null, 'invoice_item_id' => null, 'status' => 'completed']);
+
+            // Tugas yang ditagihkan kembali "belum ditagih" (sama seperti sesi).
+            InvoiceLineBuilder::releaseTasks($invoice);
 
             return $invoice->fresh();
         });

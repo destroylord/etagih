@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Invoice;
 use App\Actions\Invoice\CancelInvoice;
 use App\Actions\Invoice\CreateInvoice;
 use App\Actions\Invoice\DuplicateInvoice;
+use App\Actions\Invoice\InvoiceLineBuilder;
 use App\Actions\Invoice\RecordPayment;
 use App\Actions\Invoice\SendInvoice;
 use App\Actions\Invoice\UpdateInvoice;
@@ -16,9 +17,14 @@ use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
 use App\Models\WorkSession;
+use App\Support\Access;
+use App\Support\RateResolver;
 use App\Support\Settings;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +37,8 @@ class InvoiceController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Invoice::with(['client', 'project.parent'])->latest('id');
+        $user = $this->user($request);
+        $query = Invoice::with(['client', 'project.parent'])->visibleTo($user)->latest('id');
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
@@ -54,9 +61,10 @@ class InvoiceController extends Controller
         return Inertia::render('invoices/index', [
             'invoices' => $query->paginate(20)->withQueryString(),
             'filters' => $request->only(['status', 'type', 'q', 'project_id']),
-            'projects' => WorkSessionController::projectOptions(true),
+            'projects' => WorkSessionController::projectOptions(true, $user),
             // Jumlah invoice per status untuk tab filter.
             'statusCounts' => Invoice::query()
+                ->visibleTo($user)
                 ->selectRaw('status, COUNT(*) as total')
                 ->groupBy('status')
                 ->pluck('total', 'status'),
@@ -65,22 +73,124 @@ class InvoiceController extends Controller
 
     public function create(Request $request): Response
     {
+        $user = $this->user($request);
+        $clientIds = Access::clientIds($user);
+
         return Inertia::render('invoices/create', [
             'defaultTaxRate' => (float) Settings::current()->default_tax_rate,
             // Dari tombol "Buat invoice" di halaman klien / Time Tracker.
             'preselectedClientId' => $request->integer('client_id') ?: null,
             'preselectedMode' => $request->query('mode') === 'hourly' ? 'hourly' : null,
             'preselectedProjectId' => $request->integer('project_id') ?: null,
-            'clients' => Client::orderBy('name')->get(['id', 'name', 'phone', 'email', 'hourly_rate']),
-            'projects' => WorkSessionController::projectOptions(),
-            'products' => Product::active()->orderBy('name')->get(['id', 'name', 'client_id']),
+            'clients' => Client::visibleTo($user)->orderBy('name')->get(['id', 'name', 'phone', 'email', 'hourly_rate']),
+            'projects' => WorkSessionController::projectOptions(false, $user),
+            'products' => Product::active()
+                ->when($clientIds !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('client_id')->orWhereIn('client_id', $clientIds)))
+                ->orderBy('name')->get(['id', 'name', 'client_id']),
             // Semua sessions completed (unbilled) — frontend filter by client yg dipilih.
             // Batasi 500 baris; invoice dengan lebih banyak session butuh flow berbeda.
             'unbilledSessions' => WorkSession::with(['client', 'project.parent'])
                 ->where('status', 'completed')
+                ->when($clientIds !== null, fn ($q) => $q->whereIn('client_id', $clientIds))
                 ->orderByDesc('started_at')
                 ->limit(500)
-                ->get(['id', 'client_id', 'project_id', 'description', 'unit_price', 'duration_seconds', 'started_at']),
+                ->get(['id', 'client_id', 'project_id', 'task_id', 'description', 'unit_price', 'duration_seconds', 'started_at']),
+            // Staf tidak boleh membuat klien baru dari form invoice.
+            'canCreateClient' => $user->isAdmin(),
+        ]);
+    }
+
+    /**
+     * Tugas selesai, bisa ditagih, dan belum masuk invoice untuk klien tertentu
+     * (JSON untuk form invoice). `invoice_id` opsional: saat edit, tugas yang
+     * sudah ada di invoice draft itu ikut ditampilkan.
+     *
+     * Saran baris per tugas:
+     * - mode `fixed` : uraian = judul, harga = fixed_price, atau jam × tarif bila tanpa harga tetap.
+     * - mode `hourly`: sesi Time Tracker tugas (session_ids) × tarif; tugas berharga
+     *   tetap tanpa sesi → 1 jam × fixed_price (jam manual).
+     * Tarif: sub-proyek → proyek utama → klien → default (RateResolver::forProject).
+     */
+    public function billableTasks(Request $request): JsonResponse
+    {
+        $user = $this->user($request);
+        $data = $request->validate([
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'invoice_id' => ['nullable', 'integer'],
+        ]);
+        $clientId = (int) $data['client_id'];
+        abort_unless(Access::canSeeClient($user, $clientId), 404);
+
+        $invoiceId = isset($data['invoice_id']) ? (int) $data['invoice_id'] : null;
+
+        $tasks = Task::query()
+            ->visibleTo($user)
+            ->with(['project.parent', 'project.client'])
+            ->where('status', 'done')
+            ->where('billable', true)
+            ->whereHas('project', fn ($p) => $p->where('client_id', $clientId))
+            ->where(fn ($q) => $q->whereNull('invoice_id')
+                ->when($invoiceId, fn ($w) => $w->orWhere('invoice_id', $invoiceId)))
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get();
+
+        $sessions = WorkSession::query()
+            ->whereIn('task_id', $tasks->pluck('id'))
+            ->where(fn ($q) => $q->where('status', 'completed')
+                ->when($invoiceId, fn ($w) => $w->orWhere(fn ($b) => $b->where('status', 'billed')->where('invoice_id', $invoiceId))))
+            ->get(['id', 'task_id', 'duration_seconds', 'unit_price'])
+            ->groupBy('task_id');
+
+        return response()->json([
+            'tasks' => $tasks->map(function (Task $task) use ($sessions) {
+                $own = $sessions->get($task->id, collect());
+                $seconds = (int) $own->sum('duration_seconds');
+                $hours = round($seconds / 3600, 4);
+                $rate = RateResolver::forProject($task->project);
+                $fixed = $task->fixed_price !== null ? (float) $task->fixed_price : null;
+                $sessionIds = $own->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+
+                return [
+                    'id' => $task->id,
+                    'title' => $task->title,
+                    'project_id' => $task->project_id,
+                    'project_full_name' => $task->project->full_name,
+                    'completed_at' => $task->completed_at?->toIso8601String(),
+                    'fixed_price' => $fixed,
+                    'session_ids' => $sessionIds,
+                    'total_seconds' => $seconds,
+                    'hours' => $hours,
+                    'unit_price' => $rate,
+                    'invoice_id' => $task->invoice_id,
+                    'suggested' => [
+                        'fixed' => [
+                            'task_id' => $task->id,
+                            'project_id' => $task->project_id,
+                            'description' => $task->title,
+                            'unit_price' => $fixed ?? round($hours * $rate, 2),
+                        ],
+                        'hourly' => $sessionIds !== [] || $fixed === null
+                            ? [
+                                'task_id' => $task->id,
+                                'project_id' => $task->project_id,
+                                'description' => $task->title,
+                                'unit_price' => $rate,
+                                'session_ids' => $sessionIds,
+                                'hours_qty' => $sessionIds === [] ? 0 : null,
+                            ]
+                            : [
+                                'task_id' => $task->id,
+                                'project_id' => $task->project_id,
+                                'description' => $task->title.' (harga tetap)',
+                                'unit_price' => $fixed,
+                                'session_ids' => [],
+                                'hours_qty' => 1,
+                            ],
+                    ],
+                ];
+            })->values(),
         ]);
     }
 
@@ -98,7 +208,7 @@ class InvoiceController extends Controller
         $setting = Settings::current();
 
         return Inertia::render('invoices/show', [
-            'invoice' => $invoice->load(['client', 'project.parent', 'items.product', 'items.project', 'items.sessions', 'schedules', 'payments', 'recurringParent:id,invoice_number']),
+            'invoice' => $invoice->load(['client', 'project.parent', 'items.product', 'items.project', 'items.sessions', 'items.task:id,title', 'schedules', 'payments', 'recurringParent:id,invoice_number']),
             'settings' => [
                 'company_name' => $setting->company_name,
                 'company_address' => $setting->company_address,
@@ -121,15 +231,19 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function edit(Invoice $invoice): Response
+    public function edit(Request $request, Invoice $invoice): Response
     {
         abort_unless($invoice->status === 'draft', 422, 'Hanya invoice draft yang bisa diedit.');
+        $user = $this->user($request);
+        $clientIds = Access::clientIds($user);
 
         return Inertia::render('invoices/edit', [
-            'invoice' => $invoice->load(['client', 'project.parent', 'items', 'items.project', 'items.sessions', 'schedules']),
-            'clients' => Client::orderBy('name')->get(['id', 'name', 'phone', 'email', 'hourly_rate']),
-            'projects' => WorkSessionController::projectOptions(),
-            'products' => Product::with('client')->orderBy('name')->get(['id', 'name', 'client_id']),
+            'invoice' => $invoice->load(['client', 'project.parent', 'items', 'items.project', 'items.sessions', 'items.task:id,title', 'schedules']),
+            'clients' => Client::visibleTo($user)->orderBy('name')->get(['id', 'name', 'phone', 'email', 'hourly_rate']),
+            'projects' => WorkSessionController::projectOptions(false, $user),
+            'products' => Product::with('client')
+                ->when($clientIds !== null, fn ($q) => $q->where(fn ($w) => $w->whereNull('client_id')->orWhereIn('client_id', $clientIds)))
+                ->orderBy('name')->get(['id', 'name', 'client_id']),
             // Sessions yg masih unbilled utk client ini (belum masuk invoice lain).
             'unbilledSessions' => WorkSession::with(['client', 'project.parent'])
                 ->where('client_id', $invoice->client_id)
@@ -166,6 +280,9 @@ class InvoiceController extends Controller
             WorkSession::where('invoice_id', $invoice->id)
                 ->where('status', 'billed')
                 ->update(['invoice_id' => null, 'invoice_item_id' => null, 'status' => 'completed']);
+
+            // Tugas yang ditagihkan di draft ini kembali "belum ditagih".
+            InvoiceLineBuilder::releaseTasks($invoice);
 
             $invoice->delete();
         });
@@ -254,6 +371,14 @@ class InvoiceController extends Controller
         );
 
         return back()->with('success', 'Pembayaran dicatat.');
+    }
+
+    private function user(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        return $user;
     }
 
     /**

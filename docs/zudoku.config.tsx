@@ -81,6 +81,7 @@ const config: ZudokuConfig = {
             { type: "doc", file: "panduan/ringkasan", label: "Ringkasan & alur kerja", icon: "map" },
             { type: "doc", file: "panduan/klien", icon: "users" },
             { type: "doc", file: "panduan/proyek", icon: "folder-kanban" },
+            { type: "doc", file: "panduan/task", icon: "list-todo" },
             { type: "doc", file: "panduan/produk", icon: "package" },
             { type: "doc", file: "panduan/penawaran", icon: "file-signature" },
             { type: "doc", file: "panduan/invoice", icon: "receipt" },
@@ -90,6 +91,7 @@ const config: ZudokuConfig = {
             { type: "doc", file: "panduan/portal-klien", icon: "key-round" },
             { type: "doc", file: "panduan/otomatisasi", icon: "calendar-clock" },
             { type: "doc", file: "panduan/pengguna", icon: "user-cog" },
+            { type: "doc", file: "panduan/pasang-di-hp", icon: "smartphone" },
           ],
         },
         {

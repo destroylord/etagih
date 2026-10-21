@@ -3,16 +3,16 @@ import type { FormEvent } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    ResponsiveDialog,
+    ResponsiveDialogContent,
+    ResponsiveDialogDescription,
+    ResponsiveDialogFooter,
+    ResponsiveDialogHeader,
+    ResponsiveDialogTitle,
+} from '@/components/ui/responsive-dialog';
 import {
     Select,
     SelectContent,
@@ -66,20 +66,20 @@ export function ProductFormDialog({
     };
 
     return (
-        <Dialog
+        <ResponsiveDialog
             open={open}
             onOpenChange={(v) => !form.processing && onOpenChange(v)}
         >
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>
+            <ResponsiveDialogContent className="sm:max-w-md">
+                <ResponsiveDialogHeader>
+                    <ResponsiveDialogTitle>
                         {isEdit ? 'Edit produk' : 'Tambah produk'}
-                    </DialogTitle>
-                    <DialogDescription>
+                    </ResponsiveDialogTitle>
+                    <ResponsiveDialogDescription>
                         Produk muncul sebagai pilihan saat menyusun baris item
                         invoice.
-                    </DialogDescription>
-                </DialogHeader>
+                    </ResponsiveDialogDescription>
+                </ResponsiveDialogHeader>
 
                 <form onSubmit={submit} className="grid gap-4" noValidate>
                     <div className="grid gap-2">
@@ -166,7 +166,7 @@ export function ProductFormDialog({
                     </label>
                     <InputError message={form.errors.is_active} />
 
-                    <DialogFooter className="gap-2 pt-2">
+                    <ResponsiveDialogFooter className="gap-2 pt-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -179,9 +179,9 @@ export function ProductFormDialog({
                             {form.processing && <Spinner />}
                             {isEdit ? 'Simpan perubahan' : 'Tambah produk'}
                         </Button>
-                    </DialogFooter>
+                    </ResponsiveDialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </ResponsiveDialogContent>
+        </ResponsiveDialog>
     );
 }

@@ -7,6 +7,47 @@ Bagian **Perlu tindakan** berisi langkah yang wajib dilakukan saat update.
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-10-21
+
+Fokus rilis: **kerja tim** dan **nyaman dipakai di HP**.
+
+### Perlu tindakan
+
+- Jalankan migrasi (`php artisan migrate`, otomatis di Docker bila `RUN_MIGRATIONS=true`).
+- **Akses staf kini per proyek.** Staf hanya melihat klien, proyek, invoice, penawaran, dan task
+  dari proyek tempat ia menjadi anggota. Saat migrasi, semua staf yang ada otomatis dijadikan
+  anggota semua proyek yang ada — rapikan di halaman detail proyek → **Anggota**.
+- Staf tidak lagi bisa menambah/mengubah/mengimpor klien atau proyek utama (sub-proyek & task tetap bisa).
+- Pastikan **scheduler** berjalan untuk pengingat tenggat task (setiap hari 07.00).
+- Bahasa bawaan server kini Indonesia (`APP_LOCALE=id`). Tambahkan ke `.env` bila Anda
+  menyetel `APP_LOCALE=en` secara eksplisit.
+- PWA & passkey membutuhkan HTTPS dan `APP_URL` yang sama persis dengan alamat aplikasi.
+
+### Fitur baru
+
+- **Task:** task per proyek/sub-proyek dengan penanggung jawab, prioritas, tanggal mulai, tenggat,
+  estimasi, checklist, dan komentar. Tiga tampilan: **Task saya**, **Board** (drag & drop), **List**.
+- **Anggota proyek:** admin menentukan siapa saja yang terlibat di setiap proyek.
+- **Task → Time Tracker → invoice:** mulai timer langsung dari task, lalu tagih task selesai lewat
+  **Ambil dari task** di form invoice (harga tetap atau jam × tarif, tanpa tagihan ganda).
+- **Notifikasi** di aplikasi (ikon lonceng) dan email: ditugaskan, komentar, tenggat besok, terlambat.
+  Notifikasi email bisa dimatikan per pengguna.
+- **Undangan tim** lewat email berbahasa Indonesia, berlaku 7 hari, dengan status *Menunggu* dan
+  tombol kirim ulang. Setelah bergabung, pengguna diajak menambahkan **passkey**.
+- **Tampilan mobile:** navigasi bawah (Task · Klien · + · Proyek · Akun), aksi cepat, daftar
+  berbentuk kartu, dialog berupa panel dari bawah, filter ringkas.
+- **PWA:** pasang eTagih di layar utama HP/desktop, pintasan cepat, halaman offline, dan pemberitahuan
+  versi baru. Data tetap selalu diambil dari server.
+- Status sistem memeriksa HTTPS (untuk passkey & PWA).
+
+### Perbaikan
+
+- Seluruh tampilan login, keamanan, 2FA, passkey, dan profil kini berbahasa Indonesia, termasuk
+  pesan validasi, email verifikasi/reset password, dan tanggal relatif.
+- Email reset password berbahasa Indonesia.
+- Antrean offline Time Tracker kini ikut mengirim proyek yang dipilih.
+- Header dan panel ringkasan form yang *sticky* kini benar-benar menempel saat digulir.
+
 ## [1.1.0] — 2026-10-18
 
 Nama baru: **eTagih** (sebelumnya MyInvoice). Fokus proyek: aplikasi self-host.

@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { ExternalLink, FolderKanban } from 'lucide-react';
+import { ExternalLink, FolderKanban, ListTodo } from 'lucide-react';
 import { StatusBadge } from '@/components/invoice-status-badge';
 import {
     Table,
@@ -73,6 +73,23 @@ function ProjectLink({ s }: { s: TrackerSession }) {
     );
 }
 
+function TaskLink({ s }: { s: TrackerSession }) {
+    if (!s.task) {
+        return null;
+    }
+
+    return (
+        <Link
+            href={`/tasks?task=${s.task.id}`}
+            className="flex max-w-full items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+            <ListTodo className="size-3 shrink-0" aria-hidden />
+            <span className="sr-only">Task:</span>
+            <span className="truncate">{s.task.title}</span>
+        </Link>
+    );
+}
+
 function InvoiceLink({ s }: { s: TrackerSession }) {
     if (s.status !== 'billed' || !s.invoice_id) {
         return null;
@@ -124,6 +141,7 @@ export function SessionsTable({ sessions }: { sessions: TrackerSession[] }) {
                                             {s.user && ` · oleh ${s.user.name}`}
                                         </p>
                                         <ProjectLink s={s} />
+                                        <TaskLink s={s} />
                                     </TableCell>
                                     <TableCell>
                                         <p>{formatDate(s.started_at)}</p>
@@ -174,6 +192,7 @@ export function SessionsTable({ sessions }: { sessions: TrackerSession[] }) {
                                         {s.user && ` · ${s.user.name}`}
                                     </p>
                                     <ProjectLink s={s} />
+                                    <TaskLink s={s} />
                                 </div>
                                 <StatusBadge status={s.status} />
                             </div>

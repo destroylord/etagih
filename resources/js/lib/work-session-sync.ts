@@ -18,6 +18,9 @@ export type QueueOp = {
         description?: string;
         unit_price?: number;
         notes?: string | null;
+        project_id?: number | null;
+        /** Tugas yang dikerjakan (klien & proyek ikut tugas di server). */
+        task_id?: number | null;
     };
 };
 
@@ -168,6 +171,8 @@ async function postOp(
             description: op.payload?.description,
             unit_price: op.payload?.unit_price,
             notes: op.payload?.notes ?? null,
+            project_id: op.payload?.project_id ?? null,
+            task_id: op.payload?.task_id ?? null,
         };
     } else {
         // pause/resume/stop/cancel menempel ke session aktif.

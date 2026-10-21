@@ -25,6 +25,7 @@ import { ClientProjects } from '@/components/clients/client-projects';
 import { DataPagination } from '@/components/data-pagination';
 import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/invoice-status-badge';
+import { OverflowActions } from '@/components/mobile/overflow-actions';
 import { PageContainer, PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useCan } from '@/hooks/use-can';
 import {
     dueLabel,
     formatDate,
@@ -207,6 +209,8 @@ export default function ClientsShow({
     const [editOpen, setEditOpen] = useState(false);
     const [editKey, setEditKey] = useState(0);
     const [keyOpen, setKeyOpen] = useState(false);
+    // Edit klien, kunci portal & export hanya untuk admin.
+    const { manageClients } = useCan();
 
     const toggle = (id: number) => setExpanded((o) => ({ ...o, [id]: !o[id] }));
 
@@ -239,27 +243,33 @@ export default function ClientsShow({
                     backHref="/clients"
                     actions={
                         <>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    setEditKey((k) => k + 1);
-                                    setEditOpen(true);
-                                }}
-                            >
-                                <Pencil /> Edit
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => setKeyOpen(true)}
-                            >
-                                <KeyRound /> Kunci akses baru
-                            </Button>
-                            <Button variant="outline" asChild>
-                                <a href={`/clients/${client.id}/export`}>
-                                    <FileDown /> Export Excel
-                                </a>
-                            </Button>
-                            <Button asChild>
+                            <OverflowActions
+                                items={[
+                                    {
+                                        label: 'Edit',
+                                        icon: Pencil,
+                                        hidden: !manageClients,
+                                        onClick: () => {
+                                            setEditKey((k) => k + 1);
+                                            setEditOpen(true);
+                                        },
+                                    },
+                                    {
+                                        label: 'Kunci akses baru',
+                                        icon: KeyRound,
+                                        hidden: !manageClients,
+                                        onClick: () => setKeyOpen(true),
+                                    },
+                                    {
+                                        label: 'Export Excel',
+                                        icon: FileDown,
+                                        hidden: !manageClients,
+                                        href: `/clients/${client.id}/export`,
+                                        external: true,
+                                    },
+                                ]}
+                            />
+                            <Button asChild className="flex-1 sm:flex-none">
                                 <Link href={createInvoiceHref}>
                                     <FilePlus2 /> Buat invoice
                                 </Link>
@@ -268,7 +278,7 @@ export default function ClientsShow({
                     }
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
                     <StatCard
                         label="Total ditagih"
                         value={formatIDR(summary.total_billed)}

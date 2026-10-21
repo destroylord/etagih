@@ -175,11 +175,14 @@ export default function QuotesShow({
                         <QuotePaper quote={quote} settings={settings} />
                     </div>
 
-                    <aside className="grid gap-4">
-                        <QuoteSummaryCard
-                            quote={quote}
-                            isPastValidity={isPastValidity}
-                        />
+                    {/* Mobile: ringkasan tampil di atas kertas penawaran. */}
+                    <aside className="contents lg:grid lg:gap-4">
+                        <div className="order-first min-w-0 lg:order-none">
+                            <QuoteSummaryCard
+                                quote={quote}
+                                isPastValidity={isPastValidity}
+                            />
+                        </div>
                         <ConvertedInvoiceCard quote={quote} />
                         <QuoteResponseCard quote={quote} />
                         <QuoteLinkCard quote={quote} url={publicUrl} />

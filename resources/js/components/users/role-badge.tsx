@@ -2,6 +2,7 @@ import { Crown, ShieldCheck, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { UserRole } from '@/hooks/use-can';
 import { cn } from '@/lib/utils';
+import type { UserStatus } from './types';
 
 const STYLES: Record<
     UserRole,
@@ -36,6 +37,26 @@ export function RoleBadge({ role }: { role: UserRole }) {
             {style.label}
         </Badge>
     );
+}
+
+/** Status akun: Menunggu (undangan belum diterima), Aktif, atau Nonaktif. */
+export function StatusBadge({ status }: { status: UserStatus }) {
+    if (status === 'pending') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1.5 border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-400"
+            >
+                <span
+                    className="size-1.5 rounded-full bg-amber-500"
+                    aria-hidden
+                />
+                Menunggu
+            </Badge>
+        );
+    }
+
+    return <ActiveBadge active={status === 'active'} />;
 }
 
 export function ActiveBadge({ active }: { active: boolean }) {

@@ -24,6 +24,13 @@ class ResetUserPassword implements ResetsUserPasswords
 
         $user->forceFill([
             'password' => $input['password'],
-        ])->save();
+        ]);
+
+        // Pengguna undangan yang memilih "Lupa password" → undangan dianggap diterima.
+        if ($user->isInvitationPending()) {
+            $user->forceFill(['invitation_accepted_at' => now()]);
+        }
+
+        $user->save();
     }
 }

@@ -11,12 +11,14 @@ pemilik dan admin).
 
 | Kemampuan                                                              | Pemilik | Admin | Staf |
 | ---------------------------------------------------------------------- | :-----: | :---: | :--: |
-| Membuat, mengubah, dan mengirim invoice & penawaran                     |   ✅    |  ✅   |  ✅  |
+| Melihat klien, proyek, invoice, dan penawaran                           |  Semua  | Semua | Hanya proyek yang diikuti |
+| Membuat, mengubah, dan mengirim invoice & penawaran                     |   ✅    |  ✅   |  ✅ (klien proyeknya) |
 | Mencatat pembayaran                                                     |   ✅    |  ✅   |  ✅  |
-| Menambah & mengubah klien, proyek, dan produk                           |   ✅    |  ✅   |  ✅  |
+| Membuat & mengubah task, sub-proyek                                     |   ✅    |  ✅   |  ✅ (di proyeknya) |
 | Time tracker (stopwatch milik sendiri)                                  |   ✅    |  ✅   |  ✅  |
-| Menghapus klien atau proyek                                             |   ✅    |  ✅   |  ❌  |
-| Membatalkan invoice                                                     |   ✅    |  ✅   |  ❌  |
+| Menambah, mengubah, mengimpor, dan menghapus klien                      |   ✅    |  ✅   |  ❌  |
+| Menambah & mengubah proyek utama, mengatur anggota proyek               |   ✅    |  ✅   |  ❌  |
+| Menghapus proyek, membatalkan invoice                                   |   ✅    |  ✅   |  ❌  |
 | Ekspor Excel (invoice & klien) dan halaman Laporan                      |   ✅    |  ✅   |  ❌  |
 | Pengaturan invoice, QRIS, dan Status sistem                             |   ✅    |  ✅   |  ❌  |
 | Menambah, mengubah, menonaktifkan, dan menghapus **staf**               |   ✅    |  ✅   |  ❌  |
@@ -25,8 +27,23 @@ pemilik dan admin).
 
 - **Pemilik** — hanya ada satu. Biasanya akun pertama yang dibuat saat instalasi.
 - **Admin** — akses penuh ke aplikasi, tetapi hanya bisa mengelola akun staf.
-- **Staf** — cocok untuk tim operasional: menagih dan mencatat pembayaran, tanpa akses ke
-  pengaturan, laporan, maupun tindakan yang menghapus data.
+- **Staf** — cocok untuk anggota tim: mengerjakan task, mencatat waktu, menagih, dan mencatat
+  pembayaran **di proyek tempat ia menjadi anggota**, tanpa akses ke pengaturan, laporan, maupun
+  tindakan yang menghapus data.
+
+## Anggota proyek
+
+Staf hanya melihat klien, proyek, invoice, penawaran, dan task milik proyek yang ia ikuti.
+Atur anggota di halaman detail proyek → kartu **Anggota** → **Kelola anggota** (pemilik/admin).
+Anggota proyek utama otomatis bisa mengakses semua sub-proyeknya.
+
+:::tip
+
+Saat memperbarui dari versi 1.1, semua staf yang sudah ada otomatis dijadikan anggota semua
+proyek yang ada, supaya tidak ada yang tiba-tiba kehilangan akses. Rapikan keanggotaannya
+setelah update.
+
+:::
 
 :::note
 
@@ -41,13 +58,17 @@ menampilkan pesan **403 – Halaman ini hanya untuk admin**.
 2. Isi nama dan email (email harus unik).
 3. Pilih role. Admin hanya bisa menambah staf; pemilik bisa menambah admin maupun staf.
 4. Pilih cara mengatur password:
-   - **Kirim email untuk mengatur password** — pengguna menerima tautan dan memilih password
-     sendiri. Membutuhkan [konfigurasi email](/memulai/konfigurasi) yang berfungsi. Jika email
-     gagal terkirim, akun tetap dibuat dan muncul peringatan; kirim ulang lewat menu
-     **Kirim reset password** atau buat akun baru dengan password sementara.
+   - **Kirim undangan via email** — pengguna menerima email undangan berbahasa Indonesia
+     berisi tombol **Terima undangan & buat password**. Tautan berlaku **7 hari**. Membutuhkan
+     [konfigurasi email](/memulai/konfigurasi) yang berfungsi. Selama belum diterima, status
+     pengguna **Menunggu**; kirim ulang lewat menu **⋯ → Kirim ulang undangan** (tautan lama
+     otomatis tidak berlaku).
    - **Buat password sementara** — aplikasi membuat password acak 12 karakter dan
      menampilkannya **sekali** setelah akun dibuat. Salin dan berikan langsung ke pengguna,
      lalu minta mereka menggantinya di **Pengaturan → Keamanan**.
+
+Setelah menerima undangan, pengguna langsung masuk dan diarahkan ke **Pengaturan → Keamanan**
+dengan ajakan menambahkan **passkey** (masuk dengan sidik jari, wajah, atau PIN perangkat).
 
 Akun yang dibuat dari halaman ini langsung dianggap terverifikasi.
 
@@ -82,3 +103,14 @@ Setiap pengguna punya stopwatch sendiri: masing-masing boleh memiliki **satu** s
 (berjalan atau dijeda) dalam waktu yang sama, jadi beberapa anggota tim bisa mencatat waktu
 bersamaan. Riwayat sesi menyimpan siapa yang mencatatnya. Sesi lama dari sebelum fitur ini
 ada dicatat atas nama pemilik.
+
+## Passkey
+
+Passkey bisa didaftarkan di **Pengaturan → Keamanan** dan dipakai lewat tombol
+**Masuk dengan passkey** di halaman login. Syaratnya:
+
+- Aplikasi dibuka lewat **HTTPS** (atau `localhost` saat pengembangan).
+- `APP_URL` sama persis dengan alamat yang dibuka di browser. Jika domain diganti, passkey lama
+  tidak berlaku dan perlu didaftarkan ulang.
+
+Halaman **Status sistem** menampilkan peringatan bila `APP_URL` belum memakai HTTPS.

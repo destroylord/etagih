@@ -3,6 +3,7 @@
 use App\Actions\Invoice\CreateInvoice;
 use App\Actions\Invoice\WorkSessionAction;
 use App\Models\Client;
+use App\Models\Project;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\WorkSession;
@@ -169,6 +170,8 @@ it('per-user lock: two users can each have an active session', function () {
 it('start endpoint records the current user and time tracker shows only their active session', function () {
     $client = Client::create(['name' => 'A']);
     $staff = User::factory()->state(['role' => 'staff'])->create();
+    // Staf hanya bisa mencatat waktu di klien dari proyek yang ia ikuti.
+    Project::create(['client_id' => $client->id, 'name' => 'Proyek A'])->members()->attach($staff);
 
     $this->actingAs($staff)->post(route('work-sessions.start'), [
         'client_id' => $client->id, 'description' => 'Staf', 'unit_price' => 100000,
@@ -305,9 +308,12 @@ it('only lets the session owner or an admin control a running session', function
     $staffA = User::factory()->create(['role' => 'staff']);
     $staffB = User::factory()->create(['role' => 'staff']);
     $admin = User::factory()->create(['role' => 'admin']);
+    // Keduanya anggota proyek → sesi terlihat oleh staf B, tetapi bukan miliknya (403).
+    $project = Project::create(['client_id' => $client->id, 'name' => 'Proyek Tim']);
+    $project->members()->attach([$staffA->id, $staffB->id]);
 
     $session = WorkSession::create([
-        'user_id' => $staffA->id, 'client_id' => $client->id, 'description' => 'Kerja A',
+        'user_id' => $staffA->id, 'client_id' => $client->id, 'project_id' => $project->id, 'description' => 'Kerja A',
         'unit_price' => 100000, 'started_at' => now()->subMinutes(30), 'status' => 'running',
     ]);
 

@@ -19,6 +19,10 @@ import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import InputError from '@/components/input-error';
+import {
+    MobileActionBar,
+    MobileActionBarSpacer,
+} from '@/components/mobile/mobile-action-bar';
 import { ProjectSelect } from '@/components/projects/project-select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -52,6 +56,7 @@ import type {
     ProjectOption,
     Recurrence,
 } from '@/types/models';
+import type { BillableTask } from '@/types/tasks';
 import { ItemsEditor } from './items-editor';
 import {
     AffixInput,
@@ -63,6 +68,7 @@ import {
 import type { Choice } from './parts';
 import { ProductPickerDialog } from './product-picker-dialog';
 import { SessionPicker, sessionInProject } from './session-picker';
+import { TaskPickerDialog } from './task-picker-dialog';
 import {
     blankRow,
     buildSchedulePreview,
@@ -156,6 +162,10 @@ export type InvoiceFormProps = {
     submitLabel: string;
     cancelHref: string;
     defaultTaxRate?: number;
+    /** Id invoice yang diedit (untuk daftar tugas yang sudah tertaut). */
+    invoiceId?: number | null;
+    /** Staf tidak boleh membuat client baru dari form ini. */
+    canCreateClient?: boolean;
 };
 
 export function InvoiceForm({
@@ -170,6 +180,8 @@ export function InvoiceForm({
     submitLabel,
     cancelHref,
     defaultTaxRate = 0,
+    invoiceId = null,
+    canCreateClient = true,
 }: InvoiceFormProps) {
     const isEdit = mode === 'edit';
     const form = useForm<InvoiceFormData>(initial);
@@ -177,8 +189,17 @@ export function InvoiceForm({
     const errors = form.errors as Record<string, string | undefined>;
 
     const [newClient, setNewClient] = useState(
-        !isEdit && initial.client_id === null,
+        !isEdit && canCreateClient && initial.client_id === null,
     );
+    /** Data tugas yang diambil lewat "Ambil dari task" (untuk ganti mode). */
+    const [pickedTasks, setPickedTasks] = useState<Map<number, BillableTask>>(
+        () => new Map(),
+    );
+    /**
+     * Sesi tugas yang tidak ada di prop `sessions` (mis. lewat batas 500):
+     * dibuat sintetis dari total detik tugas supaya jam baris tetap benar.
+     */
+    const [extraSessions, setExtraSessions] = useState<FormSession[]>([]);
     const submittedKeys = useRef<string[]>([]);
     const errorAlertRef = useRef<HTMLDivElement>(null);
 
@@ -186,8 +207,8 @@ export function InvoiceForm({
     const isInstallment = data.type === 'installment';
 
     const sessionMap = useMemo(
-        () => new Map(sessions.map((s) => [s.id, s])),
-        [sessions],
+        () => new Map([...extraSessions, ...sessions].map((s) => [s.id, s])),
+        [sessions, extraSessions],
     );
     const selectedClient =
         data.client_id !== null
@@ -221,6 +242,15 @@ export function InvoiceForm({
             : [];
     const selectedSessionIds = useMemo(
         () => new Set(data.items.flatMap((r) => r.session_ids)),
+        [data.items],
+    );
+    const linkedTaskIds = useMemo(
+        () =>
+            new Set(
+                data.items
+                    .map((r) => r.task_id)
+                    .filter((x): x is number => x !== null),
+            ),
         [data.items],
     );
     const usedProductIds = useMemo(
@@ -447,22 +477,154 @@ export function InvoiceForm({
         }
     };
 
+    /** Proyek tugas dikirim sebagai proyek baris bila sah untuk proyek invoice. */
+    const taskRowProject = (projectId: number): number | null => {
+        if (data.project_id === null) {
+            return projectId;
+        }
+
+        if (projectId === data.project_id) {
+            return null;
+        }
+
+        return invoiceProject?.parent_id === null &&
+            isWithinProject(projects, projectId, data.project_id)
+            ? projectId
+            : null;
+    };
+
+    /** Baris item dari tugas sesuai mode (cermin saran `invoices.billable-tasks`). */
+    const taskRow = (t: BillableTask, hourly: boolean, key?: string) => {
+        const line = hourly ? t.suggested.hourly : t.suggested.fixed;
+        const sessionIds = hourly ? (line.session_ids ?? []) : [];
+
+        return blankRow({
+            ...(key ? { key } : {}),
+            description: line.description,
+            unit_price: cleanDecimal(line.unit_price),
+            session_ids: sessionIds,
+            hours_qty:
+                hourly && sessionIds.length === 0
+                    ? String(line.hours_qty ?? '')
+                    : '',
+            project_id: taskRowProject(line.project_id),
+            task_id: t.id,
+            task_title: t.title,
+        });
+    };
+
+    const addTasks = (picked: BillableTask[]) => {
+        setPickedTasks((prev) => {
+            const next = new Map(prev);
+            picked.forEach((t) => next.set(t.id, t));
+
+            return next;
+        });
+
+        // Sesi tugas yang belum dikenal form → sesi sintetis (sisa total detik tugas).
+        const missing: FormSession[] = [];
+        picked.forEach((t) => {
+            const unknown = t.session_ids.filter((id) => !sessionMap.has(id));
+
+            if (unknown.length === 0) {
+                return;
+            }
+
+            const known = t.session_ids.reduce(
+                (sum, id) =>
+                    sum + toNumber(sessionMap.get(id)?.duration_seconds),
+                0,
+            );
+            const rest = Math.max(0, t.total_seconds - known);
+            unknown.forEach((id, i) =>
+                missing.push({
+                    id,
+                    client_id: data.client_id ?? 0,
+                    project_id: t.project_id,
+                    description: t.title,
+                    unit_price: String(t.unit_price),
+                    duration_seconds: i === 0 ? rest : 0,
+                    started_at: null,
+                }),
+            );
+        });
+
+        if (missing.length) {
+            setExtraSessions((prev) => [...prev, ...missing]);
+        }
+
+        setItems((items) => {
+            const rows = picked
+                .filter((t) => !items.some((r) => r.task_id === t.id))
+                .map((t) => taskRow(t, isHourly));
+            const taken = new Set(rows.flatMap((r) => r.session_ids));
+            // Sesi tugas yang sudah dicentang sebagai baris sesi biasa pindah ke baris tugas.
+            const base = items
+                .filter((r) => !isBlankRow(r))
+                .flatMap((r) => {
+                    if (
+                        r.task_id !== null ||
+                        !r.session_ids.some((id) => taken.has(id))
+                    ) {
+                        return [r];
+                    }
+
+                    const ids = r.session_ids.filter((id) => !taken.has(id));
+
+                    return ids.length ? [{ ...r, session_ids: ids }] : [];
+                });
+
+            return [...base, ...rows];
+        });
+    };
+
+    /**
+     * Saat mode berganti, baris tugas dibangun ulang dari saran backend bila
+     * datanya ada; baris tugas lama (edit) disesuaikan seadanya.
+     */
+    const convertTaskRow = (r: ItemRow, hourly: boolean): ItemRow => {
+        const t = r.task_id !== null ? pickedTasks.get(r.task_id) : undefined;
+
+        if (t) {
+            return { ...taskRow(t, hourly, r.key), project_id: r.project_id };
+        }
+
+        // Sesi tertaut tetap dibawa (mode fixed tidak mengirimnya; backend
+        // menautkan sesi tugas sendiri). Tanpa sesi → 1 jam × harga.
+        return hourly
+            ? {
+                  ...r,
+                  hours_qty: r.session_ids.length > 0 ? '' : r.hours_qty || '1',
+              }
+            : { ...r, hours_qty: '' };
+    };
+
     // ---- Perubahan field yang punya efek samping ----
     const changeMode = (mode: InvoiceMode) =>
         form.setData((prev) => {
+            if (prev.invoice_mode === mode) {
+                return prev;
+            }
+
+            const items = prev.items.map((r) =>
+                r.task_id !== null ? convertTaskRow(r, mode === 'hourly') : r,
+            );
+
             if (mode === 'fixed') {
-                // Sesi Time Tracker hanya berlaku di mode per jam.
+                // Sesi Time Tracker hanya berlaku di mode per jam (baris tugas tetap ada).
                 return {
                     ...prev,
                     invoice_mode: mode,
-                    items: prev.items.filter((r) => r.session_ids.length === 0),
+                    items: items.filter(
+                        (r) => r.task_id !== null || r.session_ids.length === 0,
+                    ),
                 };
             }
 
             return {
                 ...prev,
                 invoice_mode: mode,
-                items: withRate(prev.items, rowRate),
+                items: withRate(items, rowRate),
             };
         });
 
@@ -470,9 +632,9 @@ export function InvoiceForm({
         const client = clients.find((c) => c.id === id);
         const rate = defaultHourlyRate(projects, null, client?.hourly_rate);
         form.setData((prev) => {
-            // Sesi & proyek milik client lama dilepas saat ganti client.
+            // Sesi, tugas & proyek milik client lama dilepas saat ganti client.
             const items = prev.items
-                .filter((r) => r.session_ids.length === 0)
+                .filter((r) => r.session_ids.length === 0 && r.task_id === null)
                 .map((r) => ({ ...r, project_id: null }));
 
             return {
@@ -545,7 +707,9 @@ export function InvoiceForm({
             client_id: on ? null : (clients[0]?.id ?? null),
             project_id: null,
             items: on
-                ? prev.items.filter((r) => r.session_ids.length === 0)
+                ? prev.items.filter(
+                      (r) => r.session_ids.length === 0 && r.task_id === null,
+                  )
                 : prev.items,
         }));
     };
@@ -588,6 +752,7 @@ export function InvoiceForm({
                 unit_price: r.unit_price === '' ? 0 : r.unit_price,
                 product_id: r.product_id,
                 project_id: r.project_id,
+                task_id: r.task_id,
                 ...(d.invoice_mode === 'hourly'
                     ? r.session_ids.length > 0
                         ? { session_ids: r.session_ids }
@@ -714,7 +879,7 @@ export function InvoiceForm({
                             : 'Pilih client (dan proyeknya) atau buat client baru.'
                     }
                     actions={
-                        !isEdit && clients.length > 0 ? (
+                        !isEdit && canCreateClient && clients.length > 0 ? (
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -1020,12 +1185,21 @@ export function InvoiceForm({
                             : 'Tambahkan layanan dengan harga tetap. Enter untuk pindah ke baris berikutnya.'
                     }
                     actions={
-                        <ProductPickerDialog
-                            products={products}
-                            clientId={newClient ? null : data.client_id}
-                            usedProductIds={usedProductIds}
-                            onAdd={addProducts}
-                        />
+                        <div className="flex flex-wrap gap-2">
+                            <TaskPickerDialog
+                                clientId={newClient ? null : data.client_id}
+                                invoiceId={invoiceId}
+                                isHourly={isHourly}
+                                linkedTaskIds={linkedTaskIds}
+                                onAdd={addTasks}
+                            />
+                            <ProductPickerDialog
+                                products={products}
+                                clientId={newClient ? null : data.client_id}
+                                usedProductIds={usedProductIds}
+                                onAdd={addProducts}
+                            />
+                        </div>
                     }
                 >
                     {isHourly && !newClient && data.client_id !== null && (
@@ -1614,6 +1788,30 @@ export function InvoiceForm({
                     </CardFooter>
                 </Card>
             </aside>
+
+            {/* Mobile/tablet: total + Simpan selalu terlihat di bawah layar. */}
+            <MobileActionBarSpacer className="md:block lg:hidden" />
+            <MobileActionBar mobileOnly className="md:block lg:hidden">
+                <div className="mx-auto flex max-w-3xl items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted-foreground">
+                            {totals.pph > 0 ? 'Total dibayar' : 'Total'} ·{' '}
+                            {filledRows} item
+                        </p>
+                        <p className="truncate text-lg font-semibold tracking-tight tabular-nums">
+                            {formatIDR(totals.total)}
+                        </p>
+                    </div>
+                    <Button
+                        type="submit"
+                        className="h-11 shrink-0 px-5"
+                        disabled={form.processing}
+                    >
+                        {form.processing && <Spinner />}
+                        {form.processing ? 'Menyimpan…' : submitLabel}
+                    </Button>
+                </div>
+            </MobileActionBar>
         </form>
     );
 }

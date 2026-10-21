@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Notifications\ResetPasswordMail;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // Email reset password dalam Bahasa Indonesia.
+        ResetPassword::toMailUsing(fn (object $notifiable, string $token) => ResetPasswordMail::build($notifiable, $token));
     }
 
     /**
@@ -33,6 +39,10 @@ class AppServiceProvider extends ServiceProvider
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);
+
+        // diffForHumans()/translatedFormat() mengikuti locale aplikasi (default: id).
+        Carbon::setLocale((string) config('app.locale'));
+        CarbonImmutable::setLocale((string) config('app.locale'));
 
         $proxies = (string) config('app.trusted_proxies', '127.0.0.1');
         TrustProxies::at($proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));

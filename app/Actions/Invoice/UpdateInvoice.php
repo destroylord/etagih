@@ -45,6 +45,8 @@ class UpdateInvoice
                     'invoice_item_id' => null,
                     'status' => 'completed',
                 ]);
+            // Tugas juga dilepas; yang masih ada di form ditautkan ulang oleh buildItems().
+            InvoiceLineBuilder::releaseTasks($invoice);
 
             $invoice->items()->delete();
             $invoice->schedules()->delete();

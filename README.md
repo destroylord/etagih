@@ -23,9 +23,10 @@ Clients & projects, time tracking, QRIS payments, WhatsApp & email reminders, an
 - **Time tracker** — stopwatch per client/project with pause, rounding, offline queue; bill sessions straight into an invoice.
 - **Reports** — monthly revenue, receivables aging, top clients, per-project breakdown, Excel export.
 - **Client portal** — clients log in with an access key to see and pay all their invoices.
-- **Team** — owner, admin and staff roles; per-user time tracking.
+- **Tasks & team** — tasks per project with board (drag & drop), "my tasks" and list views, checklists, comments, due-date reminders; invite teammates by email, project-level access for staff; bill finished tasks straight into an invoice.
+- **Mobile-first & installable** — bottom navigation and card layouts on phones, installable PWA with shortcuts.
 - **Easy self-hosting** — prebuilt Docker images (amd64/arm64), browser setup wizard, system status page, update notifications, one-click backup download, client import from Excel/CSV.
-- **Secure by default** — 2FA & passkeys, hashed portal keys, webhook re-verification, financial history protected from deletion.
+- **Secure by default** — 2FA & passkeys (passwordless sign-in), hashed portal keys, webhook re-verification, financial history protected from deletion.
 
 ## Quick start
 

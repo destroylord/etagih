@@ -130,7 +130,7 @@ export function IconAction({
             variant="ghost"
             size="icon"
             className={cn(
-                'size-8 text-muted-foreground hover:text-foreground',
+                'size-10 text-muted-foreground hover:text-foreground md:size-8',
                 destructive && 'hover:bg-destructive/10 hover:text-destructive',
             )}
             onClick={onClick}

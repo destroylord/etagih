@@ -29,3 +29,10 @@ bisa ditautkan ke **proyek** saja atau langsung ke **sub-proyek**.
 - **Jam tercatat** dari sesi Time Tracker yang ditautkan.
 
 Proyek yang sudah dipakai invoice atau Time Tracker tidak bisa dihapus, jadi **arsipkan** saja.
+
+## Anggota & task
+
+Setiap proyek utama punya daftar **anggota** (kartu **Anggota** di halaman detail proyek). Staf
+hanya melihat proyek yang ia ikuti beserta sub-proyeknya — lihat [Pengguna & role](/panduan/pengguna).
+Pekerjaan di dalam proyek dibagi menjadi [task](/panduan/task); ringkasannya tampil di halaman
+detail proyek.
